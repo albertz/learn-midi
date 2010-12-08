@@ -8,10 +8,9 @@ from struct import *
 sample_mp3_file = "/Users/az/Music/Classic/Glenn Gould Plays Bach/French Suites, BWV812-7 - Gould/Bach, French Suite 1 in d, BWV812 - 1 Allemande.mp3"
 sample_mid_file = "/Users/az/Programmierung/MidiWriter/mf_BachPrelude2.mid"
 
+sampleRate = 44100
 
-def ffmpeg_to_wav(stream):
-	sampleRate = 44100
-	
+def ffmpeg_to_wav(stream):	
 	p = Popen([
 		"ffmpeg",
 		"-i", "-",
@@ -31,8 +30,6 @@ def midi_to_wav(stream):
 	return p.stdout
 	
 def wav_to_rawpcm(stream):
-	sampleRate = 44100
-	
 	h_chunkid, h_chunksize, h_rifftype = unpack("<4sI4s", stream.read(12))
 	if h_chunkid != "RIFF":
 		raise Exception, "stream is not in RIFF format"
@@ -51,8 +48,8 @@ def wav_to_rawpcm(stream):
 	
 	if dwSamplesPerSec != sampleRate: raise Exception, "we expected " + str(sampleRate) + " Hz but got " + str(dwSamplesPerSec)
 	if wBitsPerSample != 16: raise Exception, "we expected 16 bits per sample but got " + str(wBitsPerSample)
-	if wChannels != 1: raise Exception, "we expected 1 channel but got " + str(wChannels)
 	if wBlockAlign != 2: raise Exception, "we expected block align 2 but got " + str(wBlockAlign)
+	if wChannels != 1: raise Exception, "we expected 1 channel but got " + str(wChannels)
 	
 	if stream.read(4) != "data": raise Exception, "data section expected"
 	datalen = unpack("<L", stream.read(4))[0]
