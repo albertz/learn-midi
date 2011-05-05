@@ -372,14 +372,18 @@ class MidiFile:
         self.ticksPerSecond = None
 
     def open(self, filename, attrib="rb"):
-        if filename == None:
+        if filename is None:
             if attrib in ["r", "rb"]:
                 self.file = sys.stdin
             else:
                 self.file = sys.stdout
-        else:
+        elif type(filename) is file:
+			self.file = file
+        elif type(filename) is str:
             self.file = open(filename, attrib)
-
+        else:
+			raise Exception, "don't know how to interpret " + repr(filename)
+	
     def __repr__(self):
         r = "<MidiFile %d tracks\n" % len(self.tracks)
         for t in self.tracks:
