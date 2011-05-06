@@ -19,16 +19,47 @@ def ffmpeg_to_wav(stream):
 		"-f", "wav", "-"],
 		stdin = stream, stdout = PIPE, stderr = open(os.devnull, "w"))
 	return p.stdout
+
+def ffmpeg_to_rawpcm(stream):
+	return wav_to_rawpcm(ffmpeg_to_wav(stream))
+
+def midi_to_midievents(stream):
+	import midi
+	m = midi.MidiFile()
+	m.open(stream)
+	m.read()
+	m.close()
 	
-def midi_to_wav(stream):
-	p = Popen([
-		"timidity", "-",
-		"-A90", "-a",
-		"-Ow", "--output-mono", "--output-signed", "--output-16bit",
-		"-o", "-"],
-		stdin = stream, stdout = PIPE, stderr = open(os.devnull, "w"))	
-	return p.stdout
+	# WARNING: we only use track0 here and ignore others
+	for ev in m.tracks[0].events:
+		if ev.type == "DeltaTime": yield ("play", ev.time)
+		elif ev.type == "NOTE_ON": yield ("noteon", ev.track, ev.pitch, ev.velocity)
+		elif ev.type == "NOTE_OFF": yield ("noteoff", ev.track, ev.pitch)
+		elif ev.type == "SET_TEMPO": pass # TODO (?) ...
+		else:
+			print "midi warning: event", ev, "ignored"
+
+def midievents_to_rawpcm(stream):
+	# install fluidsynth and pyFluidSynth
+	# e.g. on Mac: brew install fluidsynth && easy_install pyfluidsynth
+	# get a soundfont. e.g.: http://www.schristiancollins.com/generaluser.php http://sourceforge.net/apps/trac/fluidsynth/wiki/SoundFont
+	import fluidsynth
+	fs = fluidsynth.Synth()
 	
+	for cmd in stream:
+		f = cmd[0]
+		args = cmd[1:]
+		if f == "play":
+			len, = args
+			# FluidSynth assumes an output rate of 44100 Hz.
+			# The return value will be a Numpy array of samples.
+			# By default FluidSynth generates stereo sound, so the return array will be length 2 len
+			yield fs.get_samples(44100 * len / 1000)
+		else: getattr(fs, f)(*args)
+
+def midi_to_rawpcm(stream):
+	return midievents_to_rawpcm(midi_to_midievents(stream))
+
 def wav_to_rawpcm(stream):
 	h_chunkid, h_chunksize, h_rifftype = unpack("<4sI4s", stream.read(12))
 	if h_chunkid != "RIFF":
