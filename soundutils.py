@@ -6,12 +6,16 @@ from array import array
 def streamcopy(stream):
 	#return stream
 	s = StringIO()
-	c = 0
-	while True:
-		buf = stream.read(2048)
-		if len(buf) == 0: break
-		s.write(buf)
-		c += len(buf)
+	if hasattr(stream, "read"):
+		c = 0
+		while True:
+			buf = stream.read(2048)
+			if len(buf) == 0: break
+			s.write(buf)
+			c += len(buf)
+	else:
+		for data in stream:
+			print type(data)
 	print "read", c, "bytes"
 	return s
 
