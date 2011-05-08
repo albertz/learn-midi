@@ -45,6 +45,10 @@ def midievents_to_rawpcm(stream):
 	# get a soundfont. e.g.: http://www.schristiancollins.com/generaluser.php http://sourceforge.net/apps/trac/fluidsynth/wiki/SoundFont
 	import fluidsynth
 	fs = fluidsynth.Synth()
+
+	# create a symlink or just copy such a file there
+	sfid = fs.sfload("midisoundfont.sf2")
+	fs.program_select(0, sfid, 0, 0)
 	
 	for cmd in stream:
 		f = cmd[0]
