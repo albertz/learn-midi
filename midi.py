@@ -378,7 +378,7 @@ class MidiFile:
             else:
                 self.file = sys.stdout
         elif type(filename) is file:
-			self.file = file
+			self.file = filename
         elif type(filename) is str:
             self.file = open(filename, attrib)
         else:
