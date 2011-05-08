@@ -43,7 +43,7 @@ import pyaudio
 pa = pyaudio.PyAudio()
 strm = pa.open(
 			   format = pyaudio.paInt16,
-			   channels = 2, 
+			   channels = 1, 
 			   rate = 44100, 
 			   output = True)
 
