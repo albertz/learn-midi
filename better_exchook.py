@@ -84,6 +84,7 @@ def grep_full_py_identifiers(tokens):
 def better_exchook(etype, value, tb):
 	print >>sys.stderr, "EXCEPTION"
 	print >>sys.stderr, 'Traceback (most recent call last):'
+	topFrameLocals,topFrameGlobals = None,None
 	try:
 		import linecache
 		limit = None
@@ -102,6 +103,7 @@ def better_exchook(etype, value, tb):
 			except: return old
 		while _tb is not None and (limit is None or n < limit):
 			f = _tb.tb_frame
+			topFrameLocals,topFrameGlobals = f.f_locals,f.f_globals
 			lineno = _tb.tb_lineno
 			co = f.f_code
 			filename = co.co_filename
@@ -161,9 +163,10 @@ def better_exchook(etype, value, tb):
 		debug = int(os.environ["DEBUG"]) != 0
 	except: pass
 	if debug:
-		from IPython.Shell import IPShellEmbed
-		ipshell = IPShellEmbed()
-		ipshell()
+		from IPython.Shell import IPShellEmbed,IPShell
+		ipshell = IPShell(user_ns=topFrameLocals, user_global_ns=topFrameGlobals)
+		#ipshell()
+		ipshell.mainloop()
 
 if __name__ == "__main__":
 	# some examples
