@@ -174,6 +174,15 @@ def fluid_synth_write_s16_stereo(synth, len):
     fluid_synth_write_s16(synth, len, buf, 0, 2, buf, 1, 2)
     return numpy.fromstring(buf[:], dtype=numpy.int16)
 
+def fluid_synth_write_s16_mono(synth, len):
+	"""Return generated samples in mono 16-bit format
+	Return value is a Numpy array of samples.
+	"""
+	import numpy
+	buf = create_string_buffer(len * 2)
+	fluid_synth_write_s16(synth, len, buf, 0, 1, buf, 0, 1)
+	return numpy.fromstring(buf[:], dtype=numpy.int16)
+
 
 # Object-oriented interface, simplifies access to functions
 
@@ -297,6 +306,8 @@ class Synth:
 
         """
         return fluid_synth_write_s16_stereo(self.synth, len)
+    def get_mono_samples(self, len=1024):
+        return fluid_synth_write_s16_mono(self.synth, len)
 
 def raw_audio_string(data):
     """Return a string of bytes to send to soundcard
