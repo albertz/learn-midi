@@ -15,10 +15,14 @@ def streamcopy(stream):
 			c += len(buf)
 	else:
 		for data in stream:
-			buf = raw_audio_string(data)
+			if type(data) is numpy.ndarray:
+				buf = raw_audio_string(data)
+			elif type(data) is str:
+				buf = str(data)
+			else:
+				assert False, "cannot handle " + repr(data)
 			s.write(buf)
 			c += len(buf)
-	print "read", c, "bytes"
 	return s
 
 # kind of the reverse of fluidsynth.raw_audio_string
@@ -35,13 +39,15 @@ def calcDiff(str1, str2, dt):
 	diffdata = arrayFromPCMStream(str1, numsamples) - arrayFromPCMStream(str2, numsamples)
 	return numpy.linalg.norm(diffdata)
 
+import pyaudio
+pa = pyaudio.PyAudio()
+strm = pa.open(
+			   format = pyaudio.paInt16,
+			   channels = 2, 
+			   rate = 44100, 
+			   output = True)
+
 def play(s):
-	import pyaudio
-	pa = pyaudio.PyAudio()
-	strm = pa.open(
-				   format = pyaudio.paInt16,
-				   channels = 2, 
-				   rate = 44100, 
-				   output = True)
-	if type(s) is not str: s = s.getvalue()
+	if type(s) is numpy.ndarray: s = raw_audio_string(s)
+	elif type(s) is not str: s = s.getvalue()
 	strm.write(s)
