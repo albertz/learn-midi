@@ -92,7 +92,6 @@ def better_exchook(etype, value, tb):
 		n = 0
 		_tb = tb
 		def _resolveIdentifier(namespace, id):
-			id = id.split(".")
 			obj = namespace[id[0]]
 			for part in id[1:]:
 				obj = getattr(obj, part)
@@ -115,16 +114,19 @@ def better_exchook(etype, value, tb):
 				print >>sys.stderr, '    line:', line
 				print >>sys.stderr, '    locals:'
 				alreadyPrintedLocals = set()
-				for token in grep_full_py_identifiers(parse_py_statement(line)):
-					if token in alreadyPrintedLocals: continue
-					print >>sys.stderr, '     ', token, "=",
-					tokenvalue = None
-					tokenvalue = _trySet(tokenvalue, lambda: "<local> " + repr(_resolveIdentifier(f.f_locals, token)))
-					tokenvalue = _trySet(tokenvalue, lambda: "<global> " + repr(_resolveIdentifier(f.f_globals, token)))
-					tokenvalue = _trySet(tokenvalue, lambda: "<builtin> " + repr(_resolveIdentifier(f.f_builtins, token)))
-					tokenvalue = tokenvalue or "<not found>"
-					print >>sys.stderr, tokenvalue
-					alreadyPrintedLocals.add(token)
+				for tokenstr in grep_full_py_identifiers(parse_py_statement(line)):
+					splittedtoken = tuple(tokenstr.split("."))
+					for token in map(lambda i: splittedtoken[0:i], range(1, len(splittedtoken) + 1)):
+						if token in alreadyPrintedLocals: continue
+						print >>sys.stderr, '     ', ".".join(token), "=",
+						tokenvalue = None
+						tokenvalue = _trySet(tokenvalue, lambda: "<local> " + repr(_resolveIdentifier(f.f_locals, token)))
+						tokenvalue = _trySet(tokenvalue, lambda: "<global> " + repr(_resolveIdentifier(f.f_globals, token)))
+						tokenvalue = _trySet(tokenvalue, lambda: "<builtin> " + repr(_resolveIdentifier(f.f_builtins, token)))
+						tokenvalue = tokenvalue or "<not found>"
+						print >>sys.stderr, tokenvalue
+						alreadyPrintedLocals.add(token)
+				if len(alreadyPrintedLocals) == 0: print "       no locals"
 			_tb = _tb.tb_next
 			n += 1
 
