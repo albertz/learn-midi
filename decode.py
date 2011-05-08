@@ -54,7 +54,8 @@ def midievents_to_rawpcm(stream):
 			# FluidSynth assumes an output rate of 44100 Hz.
 			# The return value will be a Numpy array of samples.
 			# By default FluidSynth generates stereo sound, so the return array will be length 2 len
-			yield fs.get_samples(44100 * len / 1000)
+			len = 44100 * len / 1000
+			if len > 0: yield fs.get_samples(len)
 		else: getattr(fs, f)(*args)
 
 def midi_to_rawpcm(stream):
