@@ -1,2 +1,5 @@
 *.pyc
 *.sf2
+
+# NetBeans
+nbproject
