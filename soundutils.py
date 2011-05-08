@@ -21,7 +21,7 @@ def streamcopy(stream):
 	print "read", c, "bytes"
 	return s
 
-
+# kind of the reverse of fluidsynth.raw_audio_string
 def arrayFromPCMStream(str, n):
 	data = array('h')
 	oldpos = str.tell()
@@ -35,3 +35,13 @@ def calcDiff(str1, str2, dt):
 	diffdata = arrayFromPCMStream(str1, numsamples) - arrayFromPCMStream(str2, numsamples)
 	return numpy.linalg.norm(diffdata)
 
+def play(s):
+	import pyaudio
+	pa = pyaudio.PyAudio()
+	strm = pa.open(
+				   format = pyaudio.paInt16,
+				   channels = 2, 
+				   rate = 44100, 
+				   output = True)
+	if type(s) is not str: s = s.getvalue()
+	strm.write(s)
