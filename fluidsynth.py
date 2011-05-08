@@ -4,6 +4,7 @@
 	pyFluidSynth
 
 	Python bindings for FluidSynth
+	http://code.google.com/p/pyfluidsynth/
 
 	Copyright 2008, Nathan Whitehead <nwhitehe@gmail.com>
 	Currently maintained by Bart Spaans <onderstekop@gmail.com>
