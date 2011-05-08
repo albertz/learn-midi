@@ -44,7 +44,7 @@ def midievents_to_rawpcm(stream):
 	# e.g. on Mac: brew install fluidsynth
 	# get a soundfont. e.g.: http://www.schristiancollins.com/generaluser.php http://sourceforge.net/apps/trac/fluidsynth/wiki/SoundFont
 	import fluidsynth
-	fs = fluidsynth.Synth()
+	fs = fluidsynth.Synth(gain=0.5)
 
 	# create a symlink or just copy such a file there
 	sfid = fs.sfload("midisoundfont.sf2")
@@ -57,10 +57,11 @@ def midievents_to_rawpcm(stream):
 			len, = args
 			# FluidSynth assumes an output rate of 44100 Hz.
 			# The return value will be a Numpy array of samples.
-			# By default FluidSynth generates stereo sound, so the return array will be length 2 len
 			len = 44100 * len / 1000
-			if len > 0: yield fs.get_samples(len)
+			if len > 0: yield fs.get_mono_samples(len)
 		else: getattr(fs, f)(*args)
+
+	fs.delete()
 
 def midi_to_rawpcm(stream):
 	return midievents_to_rawpcm(midi_to_midievents(stream))
