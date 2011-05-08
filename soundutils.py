@@ -2,12 +2,12 @@ import decode
 from cStringIO import StringIO
 import numpy
 from array import array
+from fluidsynth import raw_audio_string
 
 def streamcopy(stream):
-	#return stream
 	s = StringIO()
+	c = 0
 	if hasattr(stream, "read"):
-		c = 0
 		while True:
 			buf = stream.read(2048)
 			if len(buf) == 0: break
@@ -15,7 +15,9 @@ def streamcopy(stream):
 			c += len(buf)
 	else:
 		for data in stream:
-			print type(data)
+			buf = raw_audio_string(data)
+			s.write(buf)
+			c += len(buf)
 	print "read", c, "bytes"
 	return s
 
