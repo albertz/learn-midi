@@ -33,8 +33,8 @@ def midi_to_midievents(stream):
 	# WARNING: we only use track0 here and ignore others
 	for ev in m.tracks[0].events:
 		if ev.type == "DeltaTime": yield ("play", ev.time)
-		elif ev.type == "NOTE_ON": yield ("noteon", ev.track, ev.pitch, ev.velocity)
-		elif ev.type == "NOTE_OFF": yield ("noteoff", ev.track, ev.pitch)
+		elif ev.type == "NOTE_ON": yield ("noteon", ev.track.index, ev.pitch, ev.velocity)
+		elif ev.type == "NOTE_OFF": yield ("noteoff", ev.track.index, ev.pitch)
 		elif ev.type == "SET_TEMPO": pass # TODO (?) ...
 		else:
 			print "midi warning: event", ev, "ignored"
