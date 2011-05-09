@@ -93,12 +93,12 @@ def interpretOutMidiKeys(lastMidiKeysState, vec):
 			newState[i] = True
 	return newState
 
-def readMidiKeys_netOutput(): pass
+def readMidiKeys_netOutput(vec): pass
 
 def interpretOutMidiKeyVelocities(vec):
 	return list(vec)
 
-def readMidiKeyVelocities_netOutput(): pass
+def readMidiKeyVelocities_netOutput(vec): pass
 
 
 def getCurMidiKeyVelocities_netInput():
@@ -136,7 +136,81 @@ nn.sortModules()
 print "done"
 
 def netSetInputs():
-	pass
+	for module,inputFunc in NetInputs:
+		module.activate(inputFunc())
+
+def netReadOutputs():
+	for module,outFunc in NetOutputs:
+		outFunc(module.outputbuffer[module.offset])
+
+def tick():
+	netSetInputs()
+	midiSampler.tick()
+	nn.activate(())
+	netReadOutputs()
+
+
+# The magic is happening here!
+# See the code about how we are calculating the error.
+# We just use bt.BackpropTrainer as a base.
+# We ignore the target of the dataset though.
+class ReinforcedTrainer(bt.BackpropTrainer):
+	def __init__(self, module, rewarder, *args, **kwargs):
+		bt.BackpropTrainer.__init__(self, module, *args, **kwargs)
+		self.rewarder = rewarder # func (seq,last module-output) -> reward in [0,1]
+
+	def _calcDerivs(self, seq):
+		"""Calculate error function and backpropagate output errors to yield the gradient."""
+		self.module.reset()
+		for sample in seq:
+			self.module.activate(sample[0])
+		error = 0.
+		ponderation = 0.
+		for offset, sample in reversed(list(enumerate(seq))):
+			subseq = itertools.imap(operator.itemgetter(0), seq[:offset+1])
+			reward = self.rewarder(subseq, self.module.outputbuffer[offset])
+			
+			target = sample[1]
+			outerr = target - self.module.outputbuffer[offset] # real err. if we are reinforcing, we are not allowed to use this
+
+			# NOTE: We use the information/knowledge that the output must be in {0,1}.
+			# This is a very strict assumption and the whole trick might not work when we generalize it.
+			# normalize NN l,r output to {0.0,1.0}
+			nl,nr = self.module.outputbuffer[offset]
+			nl,nr = nl > 0.5, nr > 0.5
+			nl,nr = nl and 1.0 or 0.0, nr and 1.0 or 0.0
+			# guess target l,r
+			gl = nl * reward + (1.0-nl) * (1.0-reward)
+			gr = nr * reward + (1.0-nr) * (1.0-reward)
+			
+			outerr2 = (gl,gr) - self.module.outputbuffer[offset]
+			#print "derivs:", offset, ":", outerr, outerr2
+			outerr = outerr2
+			
+			error += 0.5 * sum(outerr ** 2)
+			ponderation += len(target)
+			# FIXME: the next line keeps arac from producing NaNs. I don't
+			# know why that is, but somehow the __str__ method of the
+			# ndarray class fixes something,
+			str(outerr)
+			self.module.backActivate(outerr)
+		
+		return error, ponderation
+
+
+def rewardFunc(seq, nnoutput):
+    seq = [ "123ABCXYZ"[pybrain.utilities.n_to_one(sample)] for sample in seq ]
+    cl,cr = outputAsVec(SeqGenerator().nextSeq(seq)[-1])
+    nl,nr = nnoutput
+    reward = 0.0
+    if nl > 0.5 and cl > 0.5: reward += 0.5
+    if nl < 0.5 and cl < 0.5: reward += 0.5
+    if nr > 0.5 and cr > 0.5: reward += 0.5
+    if nr < 0.5 and cr < 0.5: reward += 0.5
+    return reward
+
+trainer = ReinforcedTrainer(module=nn, rewarder=rewardFunc)
+
 
 import random
 from itertools import *
