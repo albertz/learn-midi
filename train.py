@@ -9,8 +9,8 @@ from soundutils import *
 from better_exchook import *
 sys.excepthook = better_exchook
 
-midistr = streamcopy(midi_to_rawpcm(open(sample_mid_file)))
-mp3str = streamcopy(ffmpeg_to_rawpcm(open(sample_mp3_file)))
+#midistr = streamcopy(midi_to_rawpcm(open(sample_mid_file)))
+#mp3str = streamcopy(ffmpeg_to_rawpcm(open(sample_mp3_file)))
 
 
 import pybrain
@@ -30,32 +30,59 @@ nn = bn.RecurrentNetwork()
 nn_in_origaudio = LinearLayer(1, name="audioin") # audio input, mono signal
 nn_in_sampleraudio = LinearLayer(1, name="sampleraudio") # audio from midi sampler
 nn_in_curmidikeys = LinearLayer(MIDINOTENUM, name="curmidikeys")
+nn_in_curmidikeyvels = LinearLayer(MIDINOTENUM, name="curmidikeyvels")
 nn_out_midikeys = LinearLayer(MIDINOTENUM, name="outmidikeys")
+nn_out_midikeyvels = LinearLayer(MIDINOTENUM, name="outmidikeyvels")
 nn_hidden_in = LSTMLayer(6, name="hidden")
 nn_hidden_out = nn_hidden_in
 
-nn.addInputModule(nn_in_origaudio) 
-nn.addModule(nn_in_sampleraudio)
 nn.addModule(nn_hidden_in)
 if nn_hidden_out is not nn_hidden_in: nn.addModule(nn_hidden_out)
-nn.addOutputModule(nn_inout_midikeys)
 
-nn.addConnection(bc.FullConnection(nn_in_origaudio, nn_hidden_in, name="in_c1"))
-nn.addConnection(bc.FullConnection(nn_in_sampleraudio, nn_hidden_in, name="in_c2"))
-nn.addConnection(bc.FullConnection(nn_in_curmidikeys, nn_hidden_in, name="in_c3"))
-nn.addConnection(bc.FullConnection(nn_hidden_out, nn_out_midikeys, name="out_c4"))
 nn.addRecurrentConnection(bc.FullConnection(nn_hidden_out, nn_hidden_in, name="recurrent_conn"))
 
-nn.sortModules()
-print "done"
 
+TicksPerSecond = 100
+AudioSamplesPerTick = 44100 / TicksPerSecond
+MillisecsPerTick = 1000 / TicksPerSecond
 
-def getAudioIn_netInput(audioSamples):
+class AudioIn:
+	def __init__(self):
+		self.stream = None
+	def load(self, filename):
+		self.pcmStream = streamcopy(ffmpeg_to_rawpcm(open(filename)))
+	def getSamples(self, num):
+		return arrayFromPCMStream(self.pcmStream, num)
+		
+audioIn = AudioIn()
+
+class MidiSampler:
+	def __init__(self):
+		self.midiKeysState = [False] * MIDINOTENUM
+		self.oldMidiKeysState = list(self.midiKeysState)
+		self.midiKeysVelocity = [0.0] * MIDINOTENUM
+		self.midiEventStream = []
+		self.pcmStream = midievents_to_rawpcm(self.midiEventStream)		
+	def tick(self):
+		for note,oldstate,newstate,velocity in izip(count(), self.oldMidiKeysState, self.midiKeysState, self.midiKeysVelocity):
+			if not oldstate and newstate:
+				self.midiEventStream += [("noteon", 0, note, ev.velocity)]
+			elif oldstate and not newstate:
+				self.midiEventStream += [("noteoff", 0, note)]
+		self.midiEventStream += [("play", MillisecsPerTick)]
+		self.oldMidiKeysState = list(self.midiKeysState)
+	def getSamples(self, num):
+		return arrayFromPCMStream(self.stream, num)
+
+midiSampler = MidiSampler()
+
+def audioSamplesAsNetInput(audioSamples):
 	audioSamples = map(lambda s: float(s) / 2**15, audioSamples)
 	return sum(audioSamples) / len(audioSamples)
 
+def getAudioIn_netInput():
+	return audioSamplesAsNetInput(audioIn.getSamples(AudioSamplesPerTick))
 
-	
 def interpretOutMidiKeys(lastMidiKeysState, vec):
 	newState = list(lastMidiKeysState)
 	assert len(vec) == MIDINOTENUM
@@ -66,8 +93,50 @@ def interpretOutMidiKeys(lastMidiKeysState, vec):
 			newState[i] = True
 	return newState
 
-def getCurMidiKeys_netInput(midiKeysState):
+def readMidiKeys_netOutput(): pass
+
+def interpretOutMidiKeyVelocities(vec):
+	return list(vec)
+
+def readMidiKeyVelocities_netOutput(): pass
+
+
+def getCurMidiKeyVelocities_netInput():
+	return list(midiSampler.midiKeysVelocity)
+
+def midiKeysAsNetInput(midiKeysState):
 	return map(lambda k: 1.0 if k else 0.0, midiKeysState)
+
+def getCurMidiKeys_netInput():
+	return midiKeysAsNetInput(midiSampler.midiKeysState)
+
+def getMidiSamplerAudio_netInput():
+	return audioSamplesAsNetInput(midiSampler.getSamples(AudioSamplesPerTick))
+
+NetInputs = [
+	(nn_in_origaudio, getAudioIn_netInput),
+	(nn_in_sampleraudio, getMidiSamplerAudio_netInput),
+	(nn_in_curmidikeys, getCurMidiKeys_netInput),
+	(nn_in_curmidikeyvels, getCurMidiKeyVelocities_netInput),
+]
+
+NetOutputs = [
+	(nn_out_midikeys, readMidiKeys_netOutput),
+	(nn_out_midikeyvels, readMidiKeyVelocities_netOutput),
+]
+
+for i,(module,_) in enumerate(NetInputs):
+	nn.addModule(module)
+	nn.addConnection(bc.FullConnection(module, nn_hidden_in, name = "in_c" + str(i)))
+for i,(module,_) in enumerate(NetOutputs):
+	nn.addModule(module)
+	nn.addConnection(bc.FullConnection(nn_hidden_out, module, name = "out_c" + str(i)))
+
+nn.sortModules()
+print "done"
+
+def netSetInputs():
+	pass
 
 import random
 from itertools import *
