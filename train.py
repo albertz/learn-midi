@@ -50,6 +50,25 @@ nn.sortModules()
 print "done"
 
 
+def getAudioIn_netInput(audioSamples):
+	audioSamples = map(lambda s: float(s) / 2**15, audioSamples)
+	return sum(audioSamples) / len(audioSamples)
+
+
+	
+def interpretOutMidiKeys(lastMidiKeysState, vec):
+	newState = list(lastMidiKeysState)
+	assert len(vec) == MIDINOTENUM
+	for i in xrange(MIDINOTENUM):
+		if vec[i] < 0.3 and lastMidiKeysState[i]:
+			newState[i] = False
+		elif vec[i] > 0.7 and not lastMidiKeysState[i]:
+			newState[i] = True
+	return newState
+
+def getCurMidiKeys_netInput(midiKeysState):
+	return map(lambda k: 1.0 if k else 0.0, midiKeysState)
+
 import random
 from itertools import *
 
