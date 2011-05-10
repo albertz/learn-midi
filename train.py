@@ -149,6 +149,8 @@ def tick():
 	nn.activate(())
 	netReadOutputs()
 
+import pybrain.supervised as bt
+
 
 # The magic is happening here!
 # See the code about how we are calculating the error.
