@@ -23,6 +23,7 @@ def streamcopy(stream):
 				assert False, "cannot handle " + repr(data)
 			s.write(buf)
 			c += len(buf)
+	s.seek(0)
 	return s
 
 # kind of the reverse of fluidsynth.raw_audio_string
