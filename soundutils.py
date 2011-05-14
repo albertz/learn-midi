@@ -28,9 +28,9 @@ def streamcopy(stream):
 # kind of the reverse of fluidsynth.raw_audio_string
 def arrayFromPCMStream(str, n):
 	data = array('h')
-	oldpos = str.tell()
+	#oldpos = str.tell()
 	data.fromstring(str.read(n * 2))
-	str.seek(oldpos)
+	#str.seek(oldpos) -- this would reset the pos. but actually, we want to go forward in the stream. so keep this commented out
 	data = numpy.array(data, numpy.int16)
 	return data
 	
