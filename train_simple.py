@@ -30,7 +30,7 @@ nn = bn.RecurrentNetwork()
 nn_in_origaudio = LinearLayer(1, name="audioin") # audio input, mono signal
 nn_out_midikeys = LinearLayer(MIDINOTENUM, name="outmidikeys")
 nn_out_midikeyvels = LinearLayer(MIDINOTENUM, name="outmidikeyvels")
-nn_hidden_in = LSTMLayer(6, name="hidden")
+nn_hidden_in = LSTMLayer(100, name="hidden")
 nn_hidden_out = nn_hidden_in
 
 nn.addModule(nn_hidden_in)
@@ -198,9 +198,8 @@ def generate_silent_midistate_seq(millisecs):
 	for i in xrange(TicksPerSecond * millisecs / 1000):
 		yield (midiKeysState, midiKeysVelocity)
 
-def generate_seq():
-	secs = random.randint(1,20)
-	millisecs = secs * 1000
+def generate_seq(maxtime):
+	millisecs = maxtime #random.randint(1,20) * 1000
 	midistate_seq = list(generate_random_midistate_seq(millisecs))
 	midievents_seq = list(midistates_to_midievents(midistate_seq))
 	pcm_stream = streamcopy(midievents_to_rawpcm(midievents_seq))
@@ -212,21 +211,21 @@ def generate_seq():
 	pcm_stream.write(chr(0) * 2 * (AudioSamplesPerSecond / 2))
 	pcm_stream.seek(0)
 	
-	for tick in xrange(TicksPerSecond * secs):
-		#print "XXX", tick, pcm_stream.tell(), len(pcm_stream.getvalue()), secs, TicksPerSecond * secs
+	for tick in xrange(TicksPerSecond * millisecs / 1000):
+		#print "XXX", tick, pcm_stream.tell(), len(pcm_stream.getvalue()), millisecs, TicksPerSecond * millisecs / 1000
 		audio = audioSamplesAsNetInput(arrayFromPCMStream(pcm_stream, AudioSamplesPerTick))
 		midikeystate,midikeyvel = midistate_seq[tick]
 		midikeystate = map(lambda s: 1.0 if s else 0.0, midikeystate)		
 		yield (audio, midikeystate + midikeyvel)
 
-def addSequence(dataset):
+def addSequence(dataset, maxtime):
     dataset.newSequence()
-    for i,o in generate_seq():
+    for i,o in generate_seq(maxtime):
         dataset.addSample(i, o)
 
-def generateData(nseq = 20):
+def generateData(nseq, maxtime):
     dataset = bd.SequentialDataSet(1, MIDINOTENUM*2)
-    for i in xrange(nseq): addSequence(dataset)
+    for i in xrange(nseq): addSequence(dataset, maxtime)
     return dataset
 
 
@@ -244,18 +243,33 @@ if __name__ == '__main__':
 		ipshell()
 	#thread.start_new_thread(userthread, ())
 	
+	import pickle
+	
+	maxtime = 100
+	tstresults = []
 	# carry out the training
 	while True:
-		print "generating data ...",
-		trndata = generateData(nseq = 20)
-		tstdata = generateData(nseq = 20)
+		print "generating data (maxtime = " + str(maxtime) + ") ...",
+		trndata = generateData(nseq = 10, maxtime = maxtime)
+		tstdata = generateData(nseq = 10, maxtime = maxtime)
 		trainer.setData(trndata)
 		print "done"
 		trainer.train()
+		print "max param:", max(map(abs, nn.params))
+		nn.params[:] = map(lambda x: max(-1.0, min(1.0, x)), nn.params)
 		trnresult = 100. * (ModuleValidator.MSE(nn, trndata))
 		tstresult = 100. * (ModuleValidator.MSE(nn, tstdata))
 		print "train error: %5.2f%%" % trnresult, ",  test error: %5.2f%%" % tstresult
-	
+		
+		tstresults += [tstresult]
+		if len(tstresults) > 10: tstresults.pop(0)
+		if len(tstresults) >= 10:
+			print "test error sum of last 10 episodes:", sum(tstresults)
+			if sum(tstresults) < 50.0:
+				pickle.dump(nn.params, open("nn_params.dump", "w"))
+				tstresults = []
+				maxtime += 100
+				
 		#s = getRandomSeq(100, ratevarlimit=random.uniform(0.0,1.0))
 		#print " real:", seqStr(s)
 		#print "   nn:", getSeqOutputFromNN(nn, s)
