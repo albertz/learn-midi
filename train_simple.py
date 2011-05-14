@@ -58,7 +58,7 @@ def midistates_to_midievents(midistate_seq, oldMidiKeysState = (False,) * MIDINO
 	for midiKeysState, midiKeysVelocity in midistate_seq:
 		for note,oldstate,newstate,velocity in izip(count(), oldMidiKeysState, midiKeysState, midiKeysVelocity):
 			if not oldstate and newstate:
-				yield ("noteon", 0, note, ev.velocity)
+				yield ("noteon", 0, note, max(0, min(127, int(round(velocity)))))
 			elif oldstate and not newstate:
 				yield ("noteoff", 0, note)
 		yield ("play", MillisecsPerTick)		
@@ -151,6 +151,9 @@ def tick():
 
 import pybrain.supervised as bt
 from numpy.random import normal
+import random
+from itertools import *
+import os
 
 def normal_only_pos(mean, std):
 	y = normal(mean, std)
@@ -180,7 +183,7 @@ def generate_random_midistate_seq(millisecs):
 		midiKeysState = map(lambda k: k - MillisecsPerTick, midiKeysState)
 		
 		numdown = len([k for k in midiKeysState if k >= 0])
-		numdown_good = normal_only_pos(1, 4)
+		numdown_good = int(round(normal_only_pos(1, 4)))
 		for _ in xrange(random.randint(0, max(numdown_good - numdown, 0))):
 			note = random_note()
 			midiKeysState[note] = random_note_time()
@@ -205,103 +208,54 @@ def generate_seq():
 	# add 500ms silence at beginning so that the NN can operate a bit on the data
 	midistate_seq = list(generate_silent_midistate_seq(500)) + midistate_seq
 	# add 500ms silence at ending (chr(0)*2 for int16(0))
+	pcm_stream.seek(0, os.SEEK_END)
 	pcm_stream.write(chr(0) * 2 * (AudioSamplesPerSecond / 2))
+	pcm_stream.seek(0)
 	
 	for tick in xrange(TicksPerSecond * secs):
+		#print "XXX", tick, pcm_stream.tell(), len(pcm_stream.getvalue()), secs, TicksPerSecond * secs
 		audio = audioSamplesAsNetInput(arrayFromPCMStream(pcm_stream, AudioSamplesPerTick))
-		midistate = midistate_seq[tick]
-		yield (audio, midistate)
+		midikeystate,midikeyvel = midistate_seq[tick]
+		midikeystate = map(lambda s: 1.0 if s else 0.0, midikeystate)		
+		yield (audio, midikeystate + midikeyvel)
 
-# The magic is happening here!
-# See the code about how we are calculating the error.
-# We just use bt.BackpropTrainer as a base.
-# We ignore the target of the dataset though.
-class ReinforcedTrainer(bt.BackpropTrainer):
-	def __init__(self, module, rewarder, *args, **kwargs):
-		bt.BackpropTrainer.__init__(self, module, *args, **kwargs)
-		self.rewarder = rewarder # func (seq,last module-output) -> reward in [0,1]
+def addSequence(dataset):
+    dataset.newSequence()
+    for i,o in generate_seq():
+        dataset.addSample(i, o)
 
-	def _calcDerivs(self, seq):
-		"""Calculate error function and backpropagate output errors to yield the gradient."""
-		self.module.reset()
-		for sample in seq:
-			self.module.activate(sample[0])
-		error = 0.
-		ponderation = 0.
-		for offset, sample in reversed(list(enumerate(seq))):
-			subseq = itertools.imap(operator.itemgetter(0), seq[:offset+1])
-			reward = self.rewarder(subseq, self.module.outputbuffer[offset])
-			
-			target = sample[1]
-			outerr = target - self.module.outputbuffer[offset] # real err. if we are reinforcing, we are not allowed to use this
-
-			# NOTE: We use the information/knowledge that the output must be in {0,1}.
-			# This is a very strict assumption and the whole trick might not work when we generalize it.
-			# normalize NN l,r output to {0.0,1.0}
-			nl,nr = self.module.outputbuffer[offset]
-			nl,nr = nl > 0.5, nr > 0.5
-			nl,nr = nl and 1.0 or 0.0, nr and 1.0 or 0.0
-			# guess target l,r
-			gl = nl * reward + (1.0-nl) * (1.0-reward)
-			gr = nr * reward + (1.0-nr) * (1.0-reward)
-			
-			outerr2 = (gl,gr) - self.module.outputbuffer[offset]
-			#print "derivs:", offset, ":", outerr, outerr2
-			outerr = outerr2
-			
-			error += 0.5 * sum(outerr ** 2)
-			ponderation += len(target)
-			# FIXME: the next line keeps arac from producing NaNs. I don't
-			# know why that is, but somehow the __str__ method of the
-			# ndarray class fixes something,
-			str(outerr)
-			self.module.backActivate(outerr)
-		
-		return error, ponderation
-
-
-def rewardFunc(seq, nnoutput):
-    seq = [ "123ABCXYZ"[pybrain.utilities.n_to_one(sample)] for sample in seq ]
-    cl,cr = outputAsVec(SeqGenerator().nextSeq(seq)[-1])
-    nl,nr = nnoutput
-    reward = 0.0
-    if nl > 0.5 and cl > 0.5: reward += 0.5
-    if nl < 0.5 and cl < 0.5: reward += 0.5
-    if nr > 0.5 and cr > 0.5: reward += 0.5
-    if nr < 0.5 and cr < 0.5: reward += 0.5
-    return reward
-
-trainer = ReinforcedTrainer(module=nn, rewarder=rewardFunc)
-
-
-import random
-from itertools import *
-
-def _highestBit(n):
-	c = 0
-	while n > 0:
-		n /= 2
-		c += 1
-	return c
-
-def _numFromBinaryVec(vec, indexStart, indexEnd):
-	num = 0
-	c = 1
-	for i in xrange(indexStart,indexEnd):
-		if vec[i] > 0.0: num += c
-		c *= 2
-	return num
-
-def _numToBinaryVec(num, bits):
-	vec = ()
-	while num > 0 and len(vec) < bits:
-		vec += (num % 2,)
-		num /= 2
-	if len(vec) < bits: vec += (0,) * (bits - len(vec))
-	return vec
+def generateData(nseq = 20):
+    dataset = bd.SequentialDataSet(1, MIDINOTENUM*2)
+    for i in xrange(nseq): addSequence(dataset)
+    return dataset
 
 
 
+from pybrain.tools.validation import ModuleValidator
 
-#print calcDiff(midistr, mp3str, 10)
+trainer = bt.BackpropTrainer(nn)
 
+
+if __name__ == '__main__':
+	import thread
+	def userthread():
+		from IPython.Shell import IPShellEmbed
+		ipshell = IPShellEmbed()
+		ipshell()
+	#thread.start_new_thread(userthread, ())
+	
+	# carry out the training
+	while True:
+		print "generating data ...",
+		trndata = generateData(nseq = 20)
+		tstdata = generateData(nseq = 20)
+		trainer.setData(trndata)
+		print "done"
+		trainer.train()
+		trnresult = 100. * (ModuleValidator.MSE(nn, trndata))
+		tstresult = 100. * (ModuleValidator.MSE(nn, tstdata))
+		print "train error: %5.2f%%" % trnresult, ",  test error: %5.2f%%" % tstresult
+	
+		#s = getRandomSeq(100, ratevarlimit=random.uniform(0.0,1.0))
+		#print " real:", seqStr(s)
+		#print "   nn:", getSeqOutputFromNN(nn, s)
