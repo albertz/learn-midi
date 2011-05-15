@@ -252,6 +252,7 @@ if __name__ == '__main__':
 	from pybrain.tools.validation import ModuleValidator
 	import pybrain.supervised as bt
 	#trainer = bt.BackpropTrainer(nn, learningrate=0.0001, momentum=0.1)
+	trainer = bt.RPropMinusTrainer(nn)
 	
 	tstresults = []
 	# carry out the training
