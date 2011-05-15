@@ -252,7 +252,19 @@ if __name__ == '__main__':
 	from pybrain.tools.validation import ModuleValidator
 	import pybrain.supervised as bt
 	#trainer = bt.BackpropTrainer(nn, learningrate=0.0001, momentum=0.1)
-	trainer = bt.RPropMinusTrainer(nn)
+	#trainer = bt.RPropMinusTrainer(nn)
+	
+	import pybrain.optimization as bo
+	#theparams = nn
+	
+	
+	theparams = [42.0]
+	from pybrain.optimization.optimizer import ContinuousOptimizer
+	def f(x): return x[0]
+	thetask = f
+	maxEvals = 1000
+	print 'fmin', bo.ExactNES(thetask, theparams, maxEvaluations=maxEvals, minimize=True).learn()
+	quit()
 	
 	tstresults = []
 	# carry out the training
