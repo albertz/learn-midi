@@ -34,8 +34,7 @@ nn_hidden_out = nn_hidden_in
 nn.addModule(nn_hidden_in)
 if nn_hidden_out is not nn_hidden_in: nn.addModule(nn_hidden_out)
 
-# NOTE/WARNING: when we use the Evolino network wrapper, it will do that for us!
-#nn.addRecurrentConnection(bc.FullConnection(nn_hidden_out, nn_hidden_in, name="recurrent_conn"))
+nn.addRecurrentConnection(bc.FullConnection(nn_hidden_out, nn_hidden_in, name="recurrent_conn"))
 
 
 AudioSamplesPerSecond = 44100
@@ -253,22 +252,6 @@ if __name__ == '__main__':
 	from pybrain.tools.validation import ModuleValidator
 	import pybrain.supervised as bt
 	#trainer = bt.BackpropTrainer(nn, learningrate=0.0001, momentum=0.1)
-
-	from pybrain.supervised.trainers.evolino import EvolinoTrainer
-	from pybrain.supervised.evolino.networkwrapper import NetworkWrapper
-	from pybrain.structure.modules.evolinonetwork import EvolinoNetwork
-	from pybrain.supervised.evolino.networkwrapper import EvolinoNetwork
-	evolino_wrapped_nn = NetworkWrapper(nn)
-	evolino_wrapped_nn.backprojectionFactor = 0.01
-	evolino_wrapped_nn.getGenome = lambda: [nn.params]
-	def setGenome(p): nn.params[:] = p[0]
-	evolino_wrapped_nn.setGenome = setGenome
-	evolino_wrapped_nn.reset = nn.reset
-	evolino_wrapped_nn.indim = nn.indim
-	evolino_wrapped_nn.outdim = nn.outdim
-	#evolino_nn = EvolinoNetwork(1, MIDINOTENUM * 2, 400)
-	trainer = EvolinoTrainer(evolino_wrapped_nn, dataset=None,
-							 wtRatio = 1./3.)
 	
 	tstresults = []
 	# carry out the training
@@ -277,7 +260,6 @@ if __name__ == '__main__':
 		trndata = generateData(nseq = nseq, maxtime = maxtime)
 		tstdata = generateData(nseq = nseq, maxtime = maxtime)
 		trainer.setData(trndata)
-		trainer.setDataset(trndata)
 		print "done"
 		trainer.train()
 		print "max param:", max(map(abs, nn.params))
