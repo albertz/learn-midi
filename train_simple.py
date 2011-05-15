@@ -210,6 +210,7 @@ def generate_seq(maxtime):
 	pcm_stream.seek(0, os.SEEK_END)
 	pcm_stream.write(chr(0) * 2 * (AudioSamplesPerSecond / 2))
 	pcm_stream.seek(0)
+	millisecs += 500
 	
 	for tick in xrange(TicksPerSecond * millisecs / 1000):
 		#print "XXX", tick, pcm_stream.tell(), len(pcm_stream.getvalue()), millisecs, TicksPerSecond * millisecs / 1000
@@ -232,8 +233,6 @@ def generateData(nseq, maxtime):
 
 from pybrain.tools.validation import ModuleValidator
 
-trainer = bt.BackpropTrainer(nn)
-
 
 if __name__ == '__main__':
 	import thread
@@ -243,9 +242,17 @@ if __name__ == '__main__':
 		ipshell()
 	#thread.start_new_thread(userthread, ())
 	
-	import pickle
-	
 	maxtime = 100
+
+	import pickle
+	try:
+		maxtime, nn.params[:] = pickle.load(open("nn_params.dump"))
+	except Exception, e:
+		print e
+		print "ignoring and continuing..."
+		
+	trainer = bt.BackpropTrainer(nn)
+		
 	tstresults = []
 	# carry out the training
 	while True:
