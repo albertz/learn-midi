@@ -204,13 +204,14 @@ def generate_seq(maxtime):
 	midievents_seq = list(midistates_to_midievents(midistate_seq))
 	pcm_stream = streamcopy(midievents_to_rawpcm(midievents_seq))
 	
-	# add 500ms silence at beginning so that the NN can operate a bit on the data
-	midistate_seq = list(generate_silent_midistate_seq(500)) + midistate_seq
-	# add 500ms silence at ending (chr(0)*2 for int16(0))
+	delaytime = 100
+	# add delaytime ms silence at beginning so that the NN can operate a bit on the data
+	midistate_seq = list(generate_silent_midistate_seq(delaytime)) + midistate_seq
+	# add delaytime ms silence at ending (chr(0)*2 for int16(0))
 	pcm_stream.seek(0, os.SEEK_END)
-	pcm_stream.write(chr(0) * 2 * (AudioSamplesPerSecond / 2))
+	pcm_stream.write(chr(0) * 2 * (AudioSamplesPerSecond * delaytime / 1000))
 	pcm_stream.seek(0)
-	millisecs += 500
+	millisecs += delaytime
 	
 	for tick in xrange(TicksPerSecond * millisecs / 1000):
 		#print "XXX", tick, pcm_stream.tell(), len(pcm_stream.getvalue()), millisecs, TicksPerSecond * millisecs / 1000
@@ -242,8 +243,9 @@ if __name__ == '__main__':
 		ipshell()
 	#thread.start_new_thread(userthread, ())
 	
-	maxtime = 100
-
+	maxtime = 50
+	nseq = 10
+	
 	import pickle
 	try:
 		maxtime, nn.params[:] = pickle.load(open("nn_params.dump"))
@@ -251,19 +253,19 @@ if __name__ == '__main__':
 		print e
 		print "ignoring and continuing..."
 		
-	trainer = bt.BackpropTrainer(nn)
+	trainer = bt.BackpropTrainer(nn, learningrate=0.001, momentum=0.1)
 		
 	tstresults = []
 	# carry out the training
 	while True:
 		print "generating data (maxtime = " + str(maxtime) + ") ...",
-		trndata = generateData(nseq = 10, maxtime = maxtime)
-		tstdata = generateData(nseq = 10, maxtime = maxtime)
+		trndata = generateData(nseq = nseq, maxtime = maxtime)
+		tstdata = generateData(nseq = nseq, maxtime = maxtime)
 		trainer.setData(trndata)
 		print "done"
 		trainer.train()
 		print "max param:", max(map(abs, nn.params))
-		nn.params[:] = map(lambda x: max(-1.0, min(1.0, x)), nn.params)
+		#nn.params[:] = map(lambda x: max(-1.0, min(1.0, x)), nn.params)
 		trnresult = 100. * (ModuleValidator.MSE(nn, trndata))
 		tstresult = 100. * (ModuleValidator.MSE(nn, tstdata))
 		print "train error: %5.2f%%" % trnresult, ",  test error: %5.2f%%" % tstresult
