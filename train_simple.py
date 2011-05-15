@@ -19,7 +19,6 @@ from pybrain.structure.modules import BiasUnit, SigmoidLayer, LinearLayer, LSTML
 import pybrain.structure.networks as bn
 import pybrain.structure.connections as bc
 import pybrain.rl.learners.valuebased as bl
-import pybrain.supervised as bt
 import pybrain.datasets.sequential as bd
 
 
@@ -28,15 +27,15 @@ MIDINOTENUM = 128
 print "preparing network ...",
 nn = bn.RecurrentNetwork()
 nn_in_origaudio = LinearLayer(1, name="audioin") # audio input, mono signal
-nn_out_midikeys = LinearLayer(MIDINOTENUM, name="outmidikeys")
-nn_out_midikeyvels = LinearLayer(MIDINOTENUM, name="outmidikeyvels")
-nn_hidden_in = LSTMLayer(100, name="hidden")
+nn_out_midi = LinearLayer(MIDINOTENUM * 2, name="outmidi")
+nn_hidden_in = LSTMLayer(1000, name="hidden")
 nn_hidden_out = nn_hidden_in
 
 nn.addModule(nn_hidden_in)
 if nn_hidden_out is not nn_hidden_in: nn.addModule(nn_hidden_out)
 
-nn.addRecurrentConnection(bc.FullConnection(nn_hidden_out, nn_hidden_in, name="recurrent_conn"))
+# NOTE/WARNING: when we use the Evolino network wrapper, it will do that for us!
+#nn.addRecurrentConnection(bc.FullConnection(nn_hidden_out, nn_hidden_in, name="recurrent_conn"))
 
 
 AudioSamplesPerSecond = 44100
@@ -121,8 +120,7 @@ NetInputs = [
 ]
 
 NetOutputs = [
-	(nn_out_midikeys, readMidiKeys_netOutput),
-	(nn_out_midikeyvels, readMidiKeyVelocities_netOutput),
+	(nn_out_midi, None),
 ]
 
 for i,(module,_) in enumerate(NetInputs):
@@ -232,7 +230,6 @@ def generateData(nseq, maxtime):
 
 
 
-from pybrain.tools.validation import ModuleValidator
 
 
 if __name__ == '__main__':
@@ -252,9 +249,27 @@ if __name__ == '__main__':
 	except Exception, e:
 		print e
 		print "ignoring and continuing..."
-		
-	trainer = bt.BackpropTrainer(nn, learningrate=0.001, momentum=0.1)
-		
+
+	from pybrain.tools.validation import ModuleValidator
+	import pybrain.supervised as bt
+	#trainer = bt.BackpropTrainer(nn, learningrate=0.0001, momentum=0.1)
+
+	from pybrain.supervised.trainers.evolino import EvolinoTrainer
+	from pybrain.supervised.evolino.networkwrapper import NetworkWrapper
+	from pybrain.structure.modules.evolinonetwork import EvolinoNetwork
+	from pybrain.supervised.evolino.networkwrapper import EvolinoNetwork
+	evolino_wrapped_nn = NetworkWrapper(nn)
+	evolino_wrapped_nn.backprojectionFactor = 0.01
+	evolino_wrapped_nn.getGenome = lambda: [nn.params]
+	def setGenome(p): nn.params[:] = p[0]
+	evolino_wrapped_nn.setGenome = setGenome
+	evolino_wrapped_nn.reset = nn.reset
+	evolino_wrapped_nn.indim = nn.indim
+	evolino_wrapped_nn.outdim = nn.outdim
+	#evolino_nn = EvolinoNetwork(1, MIDINOTENUM * 2, 400)
+	trainer = EvolinoTrainer(evolino_wrapped_nn, dataset=None,
+							 wtRatio = 1./3.)
+	
 	tstresults = []
 	# carry out the training
 	while True:
@@ -262,10 +277,11 @@ if __name__ == '__main__':
 		trndata = generateData(nseq = nseq, maxtime = maxtime)
 		tstdata = generateData(nseq = nseq, maxtime = maxtime)
 		trainer.setData(trndata)
+		trainer.setDataset(trndata)
 		print "done"
 		trainer.train()
 		print "max param:", max(map(abs, nn.params))
-		#nn.params[:] = map(lambda x: max(-1.0, min(1.0, x)), nn.params)
+		nn.params[:] = map(lambda x: max(-1.0, min(1.0, x)), nn.params)
 		trnresult = 100. * (ModuleValidator.MSE(nn, trndata))
 		tstresult = 100. * (ModuleValidator.MSE(nn, tstdata))
 		print "train error: %5.2f%%" % trnresult, ",  test error: %5.2f%%" % tstresult
