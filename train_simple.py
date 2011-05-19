@@ -28,7 +28,7 @@ print "preparing network ...",
 nn = bn.RecurrentNetwork()
 nn_in_origaudio = LinearLayer(1, name="audioin") # audio input, mono signal
 nn_out_midi = LinearLayer(MIDINOTENUM * 2, name="outmidi")
-nn_hidden_in = LSTMLayer(1000, name="hidden")
+nn_hidden_in = LSTMLayer(5, name="hidden")
 nn_hidden_out = nn_hidden_in
 
 nn.addModule(nn_hidden_in)
@@ -254,17 +254,17 @@ if __name__ == '__main__':
 	#trainer = bt.BackpropTrainer(nn, learningrate=0.0001, momentum=0.1)
 	#trainer = bt.RPropMinusTrainer(nn)
 	
+	def eval_nn(params):
+		global nn, trndata
+		nn.reset()
+		nn.params[:] = params
+		return ModuleValidator.MSE(nn, trndata)
+	
 	import pybrain.optimization as bo
-	#theparams = nn
-	
-	
-	theparams = [42.0]
-	from pybrain.optimization.optimizer import ContinuousOptimizer
-	def f(x): return x[0]
-	thetask = f
+	theparams = nn.params
+	thetask = eval_nn
 	maxEvals = 1000
-	print 'fmin', bo.ExactNES(thetask, theparams, maxEvaluations=maxEvals, minimize=True).learn()
-	quit()
+	print "len params:", len(nn.params)
 	
 	tstresults = []
 	# carry out the training
@@ -272,9 +272,14 @@ if __name__ == '__main__':
 		print "generating data (maxtime = " + str(maxtime) + ") ...",
 		trndata = generateData(nseq = nseq, maxtime = maxtime)
 		tstdata = generateData(nseq = nseq, maxtime = maxtime)
-		trainer.setData(trndata)
+		#trainer.setData(trndata)
 		print "done"
-		trainer.train()
+		#trainer.train()
+		
+		params, besterror = bo.ExactNES(thetask, theparams, maxEvaluations=maxEvals, minimize=True).learn()
+		nn.params[:] = params
+		print "best error:", besterror
+		
 		print "max param:", max(map(abs, nn.params))
 		nn.params[:] = map(lambda x: max(-1.0, min(1.0, x)), nn.params)
 		trnresult = 100. * (ModuleValidator.MSE(nn, trndata))
