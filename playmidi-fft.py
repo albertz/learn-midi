@@ -1,4 +1,5 @@
 #!/usr/bin/python -u
+# -*- coding: utf-8 -*-
 
 import better_exchook
 better_exchook.install()
@@ -25,7 +26,6 @@ import math
 RATE = 44100
 N_window = RATE / 10
 window = np.blackman(N_window)
-fdata = []
 
 def show_which_freq(freqs):
 	which = freqs[1:].argmax() + 1
@@ -62,8 +62,19 @@ def resample(data, outdim):
 		outdata[outidx] = x
 	return outdata
 
+def displaychar_freq(f):
+	v = " ⎽⎼−⎻⎺"
+	#v = " ▁▂▃▄▅▆" # console font cannot display this
+	v = v.decode("utf8")
+	f *= len(v) / 30.0
+	f = int(round(f))
+	if f < 0: f = 0
+	if f >= len(v): f = len(v) - 1
+	return v[f]
+	
 if __name__ == '__main__':
 
+	fdata = []
 	while rawpcm.tell() < len(rawpcm.getvalue()):
 		data = arrayFromPCMStream(rawpcm, N_window/10)
 		fdata += list(data)
@@ -72,8 +83,12 @@ if __name__ == '__main__':
 			
 			freqs = rfft(window * fdata)
 			freqs = abs(freqs) ** 2
-			show_which_freqs(freqs)
-		
+			#show_which_freqs(freqs)
+			
+			sys.stdout.write(chr(13))
+			sys.stdout.write("".join(map(displaychar_freq, resample(np.log(freqs[0:len(freqs)/2]), 128))).encode("utf8"))
+			sys.stdout.flush()
+			
 		play(data)
 	
 	print
