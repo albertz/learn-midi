@@ -39,12 +39,12 @@ def midi_to_midievents(stream):
 		else:
 			print "midi warning: event", ev, "ignored"
 
-def midievents_to_rawpcm(stream):
+def midievents_to_rawpcm(stream, gain=0.5):
 	# install fluidsynth
 	# e.g. on Mac: brew install fluidsynth
 	# get a soundfont. e.g.: http://www.schristiancollins.com/generaluser.php http://sourceforge.net/apps/trac/fluidsynth/wiki/SoundFont
 	import fluidsynth
-	fs = fluidsynth.Synth(gain=0.5)
+	fs = fluidsynth.Synth(gain=gain)
 
 	# create a symlink or just copy such a file there
 	sfid = fs.sfload("midisoundfont.sf2")
