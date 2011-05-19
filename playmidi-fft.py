@@ -15,6 +15,7 @@ else:
 
 print "loading ...",
 midievents = midi_to_midievents(midifile)
+midievents = midievents_timemanip(midievents, 3) # this lowers the speed :)
 rawpcm = midievents_to_rawpcm(midievents, gain=4.0)
 rawpcm = streamcopy(rawpcm)
 print "done"
@@ -74,10 +75,18 @@ def displaychar_freq(f):
 	
 if __name__ == '__main__':
 
-	fdata = []
+	playdata_len = 512
+	fdata = numpy.array([])
+	playdata = numpy.array([])
 	while rawpcm.tell() < len(rawpcm.getvalue()):
 		data = arrayFromPCMStream(rawpcm, N_window/10)
-		fdata += list(data)
+
+		playdata = numpy.append(playdata, data)
+		while len(playdata) >= playdata_len:
+			play(playdata[0:playdata_len])
+			playdata = playdata[playdata_len:]
+
+		fdata = numpy.append(fdata, data)	
 		if len(fdata) > N_window:
 			fdata = fdata[len(fdata) - N_window:]
 			
@@ -88,8 +97,7 @@ if __name__ == '__main__':
 			sys.stdout.write(chr(13))
 			sys.stdout.write("".join(map(displaychar_freq, resample(np.log(freqs[0:len(freqs)/2]), 128))).encode("utf8"))
 			sys.stdout.flush()
-			
-		play(data)
+		
 	
 	print
 	print "finished"
