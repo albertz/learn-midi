@@ -47,8 +47,22 @@ strm = pa.open(
 			   channels = 1, 
 			   rate = 44100, 
 			   output = True)
+from Queue import Queue
+strmQueue = Queue(maxsize=1)
+def _strmPlayer():
+	while True:
+		s = strmQueue.get()
+		strm.write(s)
+		strmQueue.task_done()
+from threading import Thread
+strmThread = Thread(target=_strmPlayer)
+strmThread.daemon = True
+strmThread.start()
 
 def play(s):
+	if type(s) is list: s = numpy.array(s)
 	if type(s) is numpy.ndarray: s = raw_audio_string(s)
 	elif type(s) is not str: s = s.getvalue()
-	strm.write(s)
+	
+	strmQueue.put(s)
+		
