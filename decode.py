@@ -39,6 +39,16 @@ def midi_to_midievents(stream):
 		else:
 			print "midi warning: event", ev, "ignored"
 
+def midievents_timemanip(stream, timemult):
+	for cmd in stream:
+		f = cmd[0]
+		args = cmd[1:]
+		if f == "play":
+			len, = args
+			len = int(len * timemult)
+			cmd = ("play", len)
+		yield cmd
+
 def midievents_to_rawpcm(stream, gain=0.5):
 	# install fluidsynth
 	# e.g. on Mac: brew install fluidsynth
