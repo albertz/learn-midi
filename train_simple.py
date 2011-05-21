@@ -332,7 +332,7 @@ if __name__ == '__main__':
 		if blackbox:
 			method = bo.ES
 			#method = bo.ExactNES
-			params, besterror = method(task=eval_nn, params=nn.params, maxEvaluations=1000, minimize=True).learn()
+			params, besterror = method(evaluator=eval_nn, initEvaluable=nn.params, maxEvaluations=1000, minimize=True).learn()
 			nn.params[:] = params
 			print "best error from blackbox:", besterror
 
