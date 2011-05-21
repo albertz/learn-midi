@@ -96,7 +96,7 @@ for i in xrange(N+1):
 		outSliceFrom = j
 		outSliceTo = nn_in_origaudio.outdim - N + j
 		nn.addConnection(bc.LinearConnection(
-			nn_in_origaudio, nn_hidden_in,
+			nn_hidden_in, nn_hidden_out,
 			inSliceFrom=inSliceFrom, inSliceTo=inSliceTo, outSliceFrom=outSliceFrom, outSliceTo=outSliceTo,
 			name="hidden-" + str(i) + "-" + str(j)))
 
@@ -260,7 +260,7 @@ def generate_seq(maxtime):
 	
 	for tick, freqs in izip(xrange(TicksPerSecond * millisecs / 1000), pcm_to_freqs(pcm_stream)):
 		#print "XXX", tick, pcm_stream.tell(), len(pcm_stream.getvalue()), millisecs, TicksPerSecond * millisecs / 1000
-		audio = list(freqs)
+		audio = freqs
 		midikeystate,midikeyvel = midistate_seq[tick]
 		midikeystate = map(lambda s: 1.0 if s else 0.0, midikeystate)		
 		yield (audio, midikeystate + midikeyvel)
@@ -306,7 +306,7 @@ if __name__ == '__main__':
 	from pybrain.tools.validation import ModuleValidator
 	import pybrain.supervised as bt
 	#trainer = bt.BackpropTrainer(nn, learningrate=0.0001, momentum=0.1)
-	#trainer = bt.RPropMinusTrainer(nn)
+	trainer = bt.RPropMinusTrainer(nn)
 	
 	def eval_nn(params):
 		global nn, trndata
@@ -314,10 +314,9 @@ if __name__ == '__main__':
 		nn.params[:] = params
 		return ModuleValidator.MSE(nn, trndata)
 	
+	supervised = True
+	blackbox = False
 	import pybrain.optimization as bo
-	theparams = nn.params
-	thetask = eval_nn
-	maxEvals = 1000
 	
 	dump_nn_param_info()
 	
@@ -327,22 +326,31 @@ if __name__ == '__main__':
 		print "generating data (maxtime = " + str(maxtime) + ") ...",
 		trndata = generateData(nseq = nseq, maxtime = maxtime)
 		tstdata = generateData(nseq = nseq, maxtime = maxtime)
-		#trainer.setData(trndata)
+		if supervised: trainer.setData(trndata)
 		print "done"
-		#trainer.train()
 		
-		method = bo.ES
-		#method = bo.ExactNES
-		params, besterror = method(thetask, theparams, maxEvaluations=maxEvals, minimize=True).learn()
-		nn.params[:] = params
-		print "best error:", besterror
-		
+		if blackbox:
+			method = bo.ES
+			#method = bo.ExactNES
+			params, besterror = method(task=eval_nn, params=nn.params, maxEvaluations=1000, minimize=True).learn()
+			nn.params[:] = params
+			print "best error from blackbox:", besterror
+
+		if supervised:
+			trainer.train()
+			
 		print "max param:", max(map(abs, nn.params))
-		nn.params[:] = map(lambda x: max(-1.0, min(1.0, x)), nn.params)
+		#nn.params[:] = map(lambda x: max(-1.0, min(1.0, x)), nn.params)
 		trnresult = 100. * (ModuleValidator.MSE(nn, trndata))
 		tstresult = 100. * (ModuleValidator.MSE(nn, tstdata))
 		print "train error: %5.2f%%" % trnresult, ",  test error: %5.2f%%" % tstresult
 		
+		while supervised and trnresult > 5:
+			trainer.train()
+			trnresult = 100. * (ModuleValidator.MSE(nn, trndata))
+			tstresult = 100. * (ModuleValidator.MSE(nn, tstdata))
+			print "train error: %5.2f%%" % trnresult, ",  test error: %5.2f%%" % tstresult
+			
 		tstresults += [tstresult]
 		if len(tstresults) > 10: tstresults.pop(0)
 		if len(tstresults) >= 10:
@@ -352,6 +360,3 @@ if __name__ == '__main__':
 				tstresults = []
 				maxtime += 100
 				
-		#s = getRandomSeq(100, ratevarlimit=random.uniform(0.0,1.0))
-		#print " real:", seqStr(s)
-		#print "   nn:", getSeqOutputFromNN(nn, s)
