@@ -280,8 +280,8 @@ def generateData(nseq, maxtime):
 def dump_nn_param_info():
 	global nn
 	print "len params:", len(nn.params)
-	for m in nn._containerIterator():
-		print m, ":", len(m.params)
+	#for m in nn._containerIterator():
+	#	print m, ":", len(m.params)
 	print "input dim:", nn.indim
 	print "output dim:", nn.outdim
 
