@@ -68,13 +68,54 @@ print "preparing network ...",
 nn = bn.RecurrentNetwork()
 nn_in_origaudio = LinearLayer(N_window/2+1, name="audioin") # audio freqs input, mono signal
 nn_out_midi = LinearLayer(MIDINOTENUM * 2, name="outmidi")
-nn_hidden_in = LSTMLayer(5, name="hidden")
-nn_hidden_out = nn_hidden_in
+
+nn.addInputModule(nn_in_origaudio)
+nn.addOutputModule(nn_out_midi)
+
+#nn_hidden_in = LinearLayer(20, name="hidden-in")
+#nn_hidden_mid = LSTMLayer(20, name="hidden-lstm")
+#nn_hidden_out = LinearLayer(5, name="hidden-out")
+nn_hidden_in = LinearLayer(nn_out_midi.indim, name="hidden-in")
+nn_hidden_out = LinearLayer(nn_out_midi.indim, name="hidden-out")
+
+# IN -> HIDDEN-IN
+for i in xrange(nn_hidden_in.indim - nn_in_origaudio.outdim):
+	outSliceFrom = i
+	outSliceTo = nn_in_origaudio.outdim + i
+	nn.addConnection(bc.LinearConnection(
+		nn_in_origaudio, nn_hidden_in,
+		outSliceFrom=outSliceFrom, outSliceTo=outSliceTo,
+		name="in->hidden " + str(i)))
+
+# HIDDEN-IN -> HIDDEN-OUT
+N = 5
+for i in xrange(N+1):
+	inSliceFrom = i
+	inSliceTo = nn_in_origaudio.outdim - N + i
+	for j in xrange(N+1):
+		outSliceFrom = j
+		outSliceTo = nn_in_origaudio.outdim - N + j
+		nn.addConnection(bc.LinearConnection(
+			nn_in_origaudio, nn_hidden_in,
+			inSliceFrom=inSliceFrom, inSliceTo=inSliceTo, outSliceFrom=outSliceFrom, outSliceTo=outSliceTo,
+			name="hidden-" + str(i) + "-" + str(j)))
+
+# HIDDEN-OUT -> OUT
+nn.addConnection(bc.LinearConnection(nn_hidden_out, nn_out_midi, name="hidden->out"))
 
 nn.addModule(nn_hidden_in)
 if nn_hidden_out is not nn_hidden_in: nn.addModule(nn_hidden_out)
 
-nn.addRecurrentConnection(bc.FullConnection(nn_hidden_out, nn_hidden_in, name="recurrent_conn"))
+#nn.addRecurrentConnection(bc.FullConnection(nn_hidden_out, nn_hidden_in, name="recurrent_conn"))
+nn.addRecurrentConnection(bc.LinearConnection(nn_hidden_out, nn_hidden_in, name="recurrent_conn1"))
+nn.addRecurrentConnection(bc.LinearConnection(nn_out_midi, nn_hidden_in, name="recurrent_conn2"))
+
+#nn.addConnection(bc.FullConnection(nn_in_origaudio, nn_hidden_in, name = "in_c0"))
+
+#nn.addConnection(bc.FullConnection(nn_hidden_out, nn_out_midi, name = "out_c0"))
+
+nn.sortModules()
+print "done"
 
 
 
@@ -150,37 +191,7 @@ def getCurMidiKeys_netInput():
 def getMidiSamplerAudio_netInput():
 	return audioSamplesAsNetInput(midiSampler.getSamples(AudioSamplesPerTick))
 
-NetInputs = [
-	(nn_in_origaudio, getAudioIn_netInput),
-]
 
-NetOutputs = [
-	(nn_out_midi, None),
-]
-
-for i,(module,_) in enumerate(NetInputs):
-	nn.addInputModule(module)
-	nn.addConnection(bc.FullConnection(module, nn_hidden_in, name = "in_c" + str(i)))
-for i,(module,_) in enumerate(NetOutputs):
-	nn.addOutputModule(module)
-	nn.addConnection(bc.FullConnection(nn_hidden_out, module, name = "out_c" + str(i)))
-
-nn.sortModules()
-print "done"
-
-def netSetInputs():
-	for module,inputFunc in NetInputs:
-		module.activate(inputFunc())
-
-def netReadOutputs():
-	for module,outFunc in NetOutputs:
-		outFunc(module.outputbuffer[module.offset])
-
-def tick():
-	netSetInputs()
-	midiSampler.tick()
-	nn.activate(())
-	netReadOutputs()
 
 import pybrain.supervised as bt
 from numpy.random import normal
@@ -238,7 +249,7 @@ def generate_seq(maxtime):
 	midievents_seq = list(midistates_to_midievents(midistate_seq))
 	pcm_stream = streamcopy(midievents_to_rawpcm(midievents_seq))
 	
-	delaytime = 100
+	delaytime = 10
 	# add delaytime ms silence at beginning so that the NN can operate a bit on the data
 	midistate_seq = list(generate_silent_midistate_seq(delaytime)) + midistate_seq
 	# add delaytime ms silence at ending (chr(0)*2 for int16(0))
@@ -320,7 +331,9 @@ if __name__ == '__main__':
 		print "done"
 		#trainer.train()
 		
-		params, besterror = bo.ExactNES(thetask, theparams, maxEvaluations=maxEvals, minimize=True).learn()
+		method = bo.ES
+		#method = bo.ExactNES
+		params, besterror = method(thetask, theparams, maxEvaluations=maxEvals, minimize=True).learn()
 		nn.params[:] = params
 		print "best error:", besterror
 		
