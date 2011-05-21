@@ -316,9 +316,21 @@ if __name__ == '__main__':
 	
 	supervised = False
 	blackbox = True
+	postoptimize = True
 	import pybrain.optimization as bo
 	
 	dump_nn_param_info()
+
+	optimizerArgs = {"evaluator": eval_nn, "initEvaluable": nn.params, "maxEvaluations": 1000, "minimize": True}
+	if blackbox:
+		method = bo.GA
+		#method = bo.ExactNES
+		optimizer = method(**optimizerArgs)
+		population = lambda: optimizer.currentpop
+		bestparams = lambda: min(optimizer.currentpop, key = eval_nn)
+	else:
+		population = lambda: [nn.params]
+		bestparams = lambda: nn.params
 	
 	tstresults = []
 	# carry out the training
@@ -330,15 +342,25 @@ if __name__ == '__main__':
 		print "done"
 		
 		if blackbox:
-			method = bo.ES
-			#method = bo.ExactNES
-			params, besterror = method(evaluator=eval_nn, initEvaluable=nn.params, maxEvaluations=1000, minimize=True).learn()
+			optimizer._learnStep()
+			optimizer.currentpop
 			nn.params[:] = params
 			print "best error from blackbox:", besterror
 
+		if postoptimize:
+			for p in population():
+				nn.params[:] = p
+				postopti = bo.NelderMead(**optimizerArgs)
+				postopti._learnStep()
+				p[:], besterr = postopti._bestFound()
+				
 		if supervised:
-			trainer.train()
-			
+			for p in population():
+				nn.params[:] = p
+				trainer.__class__.__init__(nn) # to recopy params or do whatever else is needed
+				trainer.train()
+		
+		nn.params[:] = bestparams()
 		print "max param:", max(map(abs, nn.params))
 		#nn.params[:] = map(lambda x: max(-1.0, min(1.0, x)), nn.params)
 		trnresult = 100. * (ModuleValidator.MSE(nn, trndata))
