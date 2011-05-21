@@ -314,8 +314,8 @@ if __name__ == '__main__':
 		nn.params[:] = params
 		return ModuleValidator.MSE(nn, trndata)
 	
-	supervised = True
-	blackbox = False
+	supervised = False
+	blackbox = True
 	import pybrain.optimization as bo
 	
 	dump_nn_param_info()
