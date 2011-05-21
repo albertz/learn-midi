@@ -343,8 +343,7 @@ if __name__ == '__main__':
 		
 		if blackbox:
 			optimizer._learnStep()
-			optimizer.currentpop
-			nn.params[:] = params
+			besterror = optimizer._bestFound()[1]
 			print "best error from blackbox:", besterror
 
 		if postoptimize:
