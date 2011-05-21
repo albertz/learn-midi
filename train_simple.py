@@ -266,7 +266,13 @@ def generateData(nseq, maxtime):
 
 
 
-
+def dump_nn_param_info():
+	global nn
+	print "len params:", len(nn.params)
+	for m in nn._containerIterator():
+		print m, ":", len(m.params)
+	print "input dim:", nn.indim
+	print "output dim:", nn.outdim
 
 if __name__ == '__main__':
 	import thread
@@ -301,7 +307,8 @@ if __name__ == '__main__':
 	theparams = nn.params
 	thetask = eval_nn
 	maxEvals = 1000
-	print "len params:", len(nn.params)
+	
+	dump_nn_param_info()
 	
 	tstresults = []
 	# carry out the training
