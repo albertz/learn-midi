@@ -12,6 +12,46 @@ sys.excepthook = better_exchook
 #midistr = streamcopy(midi_to_rawpcm(open(sample_mid_file)))
 #mp3str = streamcopy(ffmpeg_to_rawpcm(open(sample_mp3_file)))
 
+AudioSamplesPerSecond = 44100
+TicksPerSecond = 100
+AudioSamplesPerTick = AudioSamplesPerSecond / TicksPerSecond
+MillisecsPerTick = 1000 / TicksPerSecond
+
+
+from numpy.fft import rfft
+import numpy as np
+import math
+
+N_window = AudioSamplesPerTick  #or let's try: AudioSamplesPerSecond / 10
+window = np.blackman(N_window)
+
+def pcm_moved_window(rawpcm):
+	prefix_len = (N_window - AudioSamplesPerTick) / 2
+	postfix_len = N_window - AudioSamplesPerTick - prefix_len
+	
+	pos = 0
+	rawpcm_len = len(rawpcm.getvalue())
+	while pos < rawpcm_len:
+		offset = pos - prefix_len
+		if offset < 0:
+			rawpcm.seek(0)
+			data = arrayFromPCMStream(rawpcm, N_window + offset)
+			data = np.append(np.zeros(-offset), data)
+		else:
+			rawpcm.seek(offset)
+			data = arrayFromPCMStream(rawpcm, N_window)
+		if len(data) < N_window:
+			data = np.append(data, np.zeros(len(data) - N_window))
+		yield data
+		pos += AudioSamplesPerTick
+
+def pcm_to_freqs(rawpcm):
+	for fdata in pcm_moved_window(rawpcm):
+		freqs = rfft(window * fdata)
+		freqs = abs(freqs) ** 2
+		freqs = np.log(freqs)
+		yield freqs
+
 
 import pybrain
 import pybrain.tools.shortcuts as bs
@@ -26,7 +66,7 @@ MIDINOTENUM = 128
 
 print "preparing network ...",
 nn = bn.RecurrentNetwork()
-nn_in_origaudio = LinearLayer(1, name="audioin") # audio input, mono signal
+nn_in_origaudio = LinearLayer(N_window/2+1, name="audioin") # audio freqs input, mono signal
 nn_out_midi = LinearLayer(MIDINOTENUM * 2, name="outmidi")
 nn_hidden_in = LSTMLayer(5, name="hidden")
 nn_hidden_out = nn_hidden_in
@@ -37,10 +77,6 @@ if nn_hidden_out is not nn_hidden_in: nn.addModule(nn_hidden_out)
 nn.addRecurrentConnection(bc.FullConnection(nn_hidden_out, nn_hidden_in, name="recurrent_conn"))
 
 
-AudioSamplesPerSecond = 44100
-TicksPerSecond = 100
-AudioSamplesPerTick = AudioSamplesPerSecond / TicksPerSecond
-MillisecsPerTick = 1000 / TicksPerSecond
 
 class AudioIn:
 	def __init__(self):
@@ -195,6 +231,7 @@ def generate_silent_midistate_seq(millisecs):
 	for i in xrange(TicksPerSecond * millisecs / 1000):
 		yield (midiKeysState, midiKeysVelocity)
 
+
 def generate_seq(maxtime):
 	millisecs = maxtime #random.randint(1,20) * 1000
 	midistate_seq = list(generate_random_midistate_seq(millisecs))
@@ -210,9 +247,9 @@ def generate_seq(maxtime):
 	pcm_stream.seek(0)
 	millisecs += delaytime
 	
-	for tick in xrange(TicksPerSecond * millisecs / 1000):
+	for tick, freqs in izip(xrange(TicksPerSecond * millisecs / 1000), pcm_to_freqs(pcm_stream)):
 		#print "XXX", tick, pcm_stream.tell(), len(pcm_stream.getvalue()), millisecs, TicksPerSecond * millisecs / 1000
-		audio = audioSamplesAsNetInput(arrayFromPCMStream(pcm_stream, AudioSamplesPerTick))
+		audio = list(freqs)
 		midikeystate,midikeyvel = midistate_seq[tick]
 		midikeystate = map(lambda s: 1.0 if s else 0.0, midikeystate)		
 		yield (audio, midikeystate + midikeyvel)
@@ -223,7 +260,7 @@ def addSequence(dataset, maxtime):
         dataset.addSample(i, o)
 
 def generateData(nseq, maxtime):
-    dataset = bd.SequentialDataSet(1, MIDINOTENUM*2)
+    dataset = bd.SequentialDataSet(nn.indim, nn.outdim)
     for i in xrange(nseq): addSequence(dataset, maxtime)
     return dataset
 
