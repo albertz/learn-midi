@@ -82,44 +82,51 @@ nn.addOutputModule(nn_out_midi)
 #nn_hidden_in = LinearLayer(20, name="hidden-in")
 #nn_hidden_mid = LSTMLayer(20, name="hidden-lstm")
 #nn_hidden_out = LinearLayer(5, name="hidden-out")
-nn_hidden_in = SigmoidLayer(nn_out_midi.indim, name="hidden-in")
-nn_hidden_out = SigmoidLayer(nn_out_midi.indim, name="hidden-out")
-
-# IN -> HIDDEN-IN
-for i in xrange(nn_hidden_in.indim - nn_in_origaudio.outdim):
-	outSliceFrom = i
-	outSliceTo = nn_in_origaudio.outdim + i
-	nn.addConnection(bc.LinearConnection(
-		nn_in_origaudio, nn_hidden_in,
-		outSliceFrom=outSliceFrom, outSliceTo=outSliceTo,
-		name="in->hidden " + str(i)))
-
-# HIDDEN-IN -> HIDDEN-OUT
-N = 5
-for i in xrange(N+1):
-	inSliceFrom = i
-	inSliceTo = nn_in_origaudio.outdim - N + i
-	for j in xrange(N+1):
-		outSliceFrom = j
-		outSliceTo = nn_in_origaudio.outdim - N + j
-		nn.addConnection(bc.LinearConnection(
-			nn_hidden_in, nn_hidden_out,
-			inSliceFrom=inSliceFrom, inSliceTo=inSliceTo, outSliceFrom=outSliceFrom, outSliceTo=outSliceTo,
-			name="hidden-" + str(i) + "-" + str(j)))
-
-# HIDDEN-OUT -> OUT
-nn.addConnection(bc.LinearConnection(nn_hidden_out, nn_out_midi, name="hidden->out"))
+nn_hidden_in = SigmoidLayer(nn_out_midi.indim * 2, name="hidden-in")
+nn_hidden_out = SigmoidLayer(nn_out_midi.indim * 2, name="hidden-out")
 
 nn.addModule(nn_hidden_in)
 if nn_hidden_out is not nn_hidden_in: nn.addModule(nn_hidden_out)
 
-#nn.addRecurrentConnection(bc.FullConnection(nn_hidden_out, nn_hidden_in, name="recurrent_conn"))
-nn.addRecurrentConnection(bc.LinearConnection(nn_hidden_out, nn_hidden_in, name="recurrent_conn1"))
-nn.addRecurrentConnection(bc.LinearConnection(nn_out_midi, nn_hidden_in, name="recurrent_conn2"))
+# IN -> HIDDEN-IN
+def linearConnect_inToHidden1():
+	for i in xrange(nn_hidden_in.indim - nn_in_origaudio.outdim):
+		outSliceFrom = i
+		outSliceTo = nn_in_origaudio.outdim + i
+		nn.addConnection(bc.LinearConnection(
+			nn_in_origaudio, nn_hidden_in,
+			outSliceFrom=outSliceFrom, outSliceTo=outSliceTo,
+			name="in->hidden " + str(i)))
 
-#nn.addConnection(bc.FullConnection(nn_in_origaudio, nn_hidden_in, name = "in_c0"))
+# HIDDEN-IN -> HIDDEN-OUT
+def linearConnect_hidden1ToHidden2():
+	N = 5
+	for i in xrange(N+1):
+		inSliceFrom = i
+		inSliceTo = nn_in_origaudio.outdim - N + i
+		for j in xrange(N+1):
+			outSliceFrom = j
+			outSliceTo = nn_in_origaudio.outdim - N + j
+			nn.addConnection(bc.LinearConnection(
+				nn_hidden_in, nn_hidden_out,
+				inSliceFrom=inSliceFrom, inSliceTo=inSliceTo, outSliceFrom=outSliceFrom, outSliceTo=outSliceTo,
+				name="hidden-" + str(i) + "-" + str(j)))
 
-#nn.addConnection(bc.FullConnection(nn_hidden_out, nn_out_midi, name = "out_c0"))
+# HIDDEN-OUT -> OUT
+def linearConnect_hidden2ToOut():
+	nn.addConnection(bc.LinearConnection(nn_hidden_out, nn_out_midi, name="hidden->out"))
+
+def linearConnect_recurrentBack():
+	#nn.addRecurrentConnection(bc.FullConnection(nn_hidden_out, nn_hidden_in, name="recurrent_conn"))
+	nn.addRecurrentConnection(bc.LinearConnection(nn_hidden_out, nn_hidden_in, name="recurrent_conn1"))
+	nn.addRecurrentConnection(bc.LinearConnection(nn_out_midi, nn_hidden_in, name="recurrent_conn2"))
+
+# NOTE: use the linearConnect_* functions -- or these:
+nn.addConnection(bc.FullConnection(nn_in_origaudio, nn_hidden_in, name = "in_c0"))
+nn.addConnection(bc.FullConnection(nn_hidden_in, nn_hidden_out, name = "hidden"))
+nn.addConnection(bc.FullConnection(nn_hidden_out, nn_out_midi, name = "out_c0"))
+nn.addRecurrentConnection(bc.FullConnection(nn_hidden_out, nn_hidden_in, name="recurrent_conn1"))
+nn.addRecurrentConnection(bc.FullConnection(nn_out_midi, nn_hidden_in, name="recurrent_conn2"))
 
 nn.sortModules()
 print "done"
