@@ -318,20 +318,27 @@ if __name__ == '__main__':
 		nn.params[:] = params
 		return ModuleValidator.MSE(nn, trndata)
 	
-	limitParams = (-1.0,1.0)
+	limitParams = (-10.0,10.0)
 	supervised = False
 	blackbox = True
 	postoptimize = True
 	import pybrain.optimization as bo
-	regenerateEpoch = 100
+	regenerateEpoch = 20
 	
 	dump_nn_param_info()
 
-	optimizerArgs = {"evaluator": eval_nn, "initEvaluable": nn.params, "maxEvaluations": 1, "minimize": True}
+	optimizerArgs = {
+		"evaluator": eval_nn, "initEvaluable": nn.params,
+		"maxEvaluations": 1, "minimize": True,
+		}
+	optiGeneticArgs = {
+		"elitism": True, "eliteProportion": 0.1,
+		"populationSize": 50,
+	}
 	if blackbox:
 		method = bo.GA
 		#method = bo.ExactNES
-		optimizer = method(**optimizerArgs)
+		optimizer = method(**dict(optimizerArgs.items() + optiGeneticArgs.items()))
 		population = lambda: optimizer.currentpop
 		bestparams = lambda: min(optimizer.currentpop, key = eval_nn)
 	else:
@@ -351,28 +358,31 @@ if __name__ == '__main__':
 			print "done"
 		
 		if blackbox:
+			print "blackbox opti ...",
 			optimizer._learnStep()
 			besterror = optimizer._bestFound()[1]
-			print "best error from blackbox:", besterror
+			print "done, best error:", besterror
 
 		if limitParams:
 			for p in population():
 				p[:] = map(lambda x: max(limitParams[0], min(limitParams[1], x)), p)
 
 		if postoptimize:
+			print "post optimize ...",
 			for p in population():
 				nn.params[:] = p
 				postopti = bo.HillClimber(**optimizerArgs)
 				postopti._learnStep()
 				p[:], besterr = postopti._bestFound()
-			print "post optimize done"
+			print "done"
 			
 		if supervised:
+			print "post supervised trainsteps ...",
 			for p in population():
 				nn.params[:] = p
 				trainer.__class__.__init__(nn) # to recopy params or do whatever else is needed
 				trainer.train()
-			print "post supervised trainstep done"
+			print "done"
 		
 		nn.params[:] = bestparams()
 		print "max param:", max(map(abs, nn.params))
