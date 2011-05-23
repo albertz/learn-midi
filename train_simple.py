@@ -318,10 +318,12 @@ if __name__ == '__main__':
 		nn.params[:] = params
 		return ModuleValidator.MSE(nn, trndata)
 	
+	limitParams = (-1.0,1.0)
 	supervised = False
 	blackbox = True
 	postoptimize = True
 	import pybrain.optimization as bo
+	regenerateEpoch = 100
 	
 	dump_nn_param_info()
 
@@ -336,19 +338,26 @@ if __name__ == '__main__':
 		population = lambda: [nn.params]
 		bestparams = lambda: nn.params
 	
+	epoch = 0
 	tstresults = []
 	# carry out the training
 	while True:
-		print "generating data (maxtime = " + str(maxtime) + ") ...",
-		trndata = generateData(nseq = nseq, maxtime = maxtime)
-		tstdata = generateData(nseq = nseq, maxtime = maxtime)
-		if supervised: trainer.setData(trndata)
-		print "done"
+		print "epoch", epoch
+		if epoch % regenerateEpoch == 0:
+			print "generating data (maxtime = " + str(maxtime) + ") ...",
+			trndata = generateData(nseq = nseq, maxtime = maxtime)
+			tstdata = generateData(nseq = nseq, maxtime = maxtime)
+			if supervised: trainer.setData(trndata)
+			print "done"
 		
 		if blackbox:
 			optimizer._learnStep()
 			besterror = optimizer._bestFound()[1]
 			print "best error from blackbox:", besterror
+
+		if limitParams:
+			for p in population():
+				p[:] = map(lambda x: max(limitParams[0], min(limitParams[1], x)), p)
 
 		if postoptimize:
 			for p in population():
@@ -367,7 +376,6 @@ if __name__ == '__main__':
 		
 		nn.params[:] = bestparams()
 		print "max param:", max(map(abs, nn.params))
-		#nn.params[:] = map(lambda x: max(-1.0, min(1.0, x)), nn.params)
 		trnresult = 100. * (ModuleValidator.MSE(nn, trndata))
 		tstresult = 100. * (ModuleValidator.MSE(nn, tstdata))
 		print "train error: %5.2f%%" % trnresult, ",  test error: %5.2f%%" % tstresult
@@ -386,4 +394,6 @@ if __name__ == '__main__':
 				pickle.dump(nn.params, open("nn_params.dump", "w"))
 				tstresults = []
 				maxtime += 100
-				
+		
+		epoch += 1
+		
