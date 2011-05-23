@@ -307,6 +307,7 @@ if __name__ == '__main__':
 		print e
 		print "ignoring and continuing..."
 
+	import pybrain.optimization as bo
 	from pybrain.tools.validation import ModuleValidator
 	import pybrain.supervised as bt
 	#trainer = bt.BackpropTrainer(nn, learningrate=0.0001, momentum=0.1)
@@ -322,9 +323,8 @@ if __name__ == '__main__':
 	supervised = False
 	blackbox = True
 	postoptimize = True
-	import pybrain.optimization as bo
 	regenerateEpoch = 20
-	
+	postOptis = [bo.HillClimber, bo.RandomSearch]
 	dump_nn_param_info()
 
 	optimizerArgs = {
@@ -369,11 +369,14 @@ if __name__ == '__main__':
 
 		if postoptimize:
 			print "post optimize ...",
+			optiIndex = 0
 			for p in population():
 				nn.params[:] = p
-				postopti = bo.HillClimber(**optimizerArgs)
+				postopti = postOptis[optiIndex](**optimizerArgs)
 				postopti._learnStep()
 				p[:], besterr = postopti._bestFound()
+				optiIndex += 1
+				optiIndex %= len(postOptis)
 			print "done"
 			
 		if supervised:
