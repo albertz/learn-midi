@@ -26,7 +26,8 @@ from numpy.fft import rfft
 import numpy as np
 import math
 
-N_window = AudioSamplesPerTick  #or let's try: AudioSamplesPerSecond / 10
+N_window = AudioSamplesPerTick
+#N_window = AudioSamplesPerSecond / 10
 window = np.blackman(N_window)
 
 def pcm_moved_window(rawpcm):
@@ -42,10 +43,10 @@ def pcm_moved_window(rawpcm):
 			data = arrayFromPCMStream(rawpcm, N_window + offset)
 			data = np.append(np.zeros(-offset), data)
 		else:
-			rawpcm.seek(offset)
+			rawpcm.seek(offset * 2) # int16
 			data = arrayFromPCMStream(rawpcm, N_window)
 		if len(data) < N_window:
-			data = np.append(data, np.zeros(len(data) - N_window))
+			data = np.append(data, np.zeros(N_window - len(data)))
 		yield data
 		pos += AudioSamplesPerTick
 
@@ -54,6 +55,7 @@ def pcm_to_freqs(rawpcm):
 		freqs = rfft(window * fdata)
 		freqs = abs(freqs) ** 2
 		freqs = np.log(freqs)
+		assert len(freqs) == N_window/2+1
 		yield freqs
 
 
@@ -71,7 +73,7 @@ MIDINOTENUM = 128
 print "preparing network ...",
 nn = bn.RecurrentNetwork()
 nn_in_origaudio = LinearLayer(N_window/2+1, name="audioin") # audio freqs input, mono signal
-nn_out_midi = LinearLayer(MIDINOTENUM * 2, name="outmidi")
+nn_out_midi = SigmoidLayer(MIDINOTENUM * 2, name="outmidi")
 
 nn.addInputModule(nn_in_origaudio)
 nn.addOutputModule(nn_out_midi)
@@ -195,6 +197,8 @@ def getCurMidiKeys_netInput():
 def getMidiSamplerAudio_netInput():
 	return audioSamplesAsNetInput(midiSampler.getSamples(AudioSamplesPerTick))
 
+def midiVelAsNetInput(vel):
+	return vel / 128.0
 
 
 import pybrain.supervised as bt
@@ -237,7 +241,7 @@ def generate_random_midistate_seq(millisecs):
 			midiKeysState[note] = random_note_time()
 			midiKeysVelocity[note] = random_note_vel()
 
-		midiKeysVelocity = map(lambda (s,v): v if s >= 0 else 0.0, izip(midiKeysState, midiKeysVelocity))
+		midiKeysVelocity = map(lambda (s,v): midiVelAsNetInput(v) if s >= 0 else 0.0, izip(midiKeysState, midiKeysVelocity))
 		yield (map(lambda s: s >= 0, midiKeysState), midiKeysVelocity)
 
 def generate_silent_midistate_seq(millisecs):
