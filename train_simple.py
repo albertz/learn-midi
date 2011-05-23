@@ -26,8 +26,8 @@ from numpy.fft import rfft
 import numpy as np
 import math
 
-N_window = AudioSamplesPerTick
-#N_window = AudioSamplesPerSecond / 10
+#N_window = AudioSamplesPerTick
+N_window = AudioSamplesPerSecond / 10
 window = np.blackman(N_window)
 
 def pcm_moved_window(rawpcm):
@@ -338,6 +338,8 @@ if __name__ == '__main__':
 	postoptimize = False
 	regenerateEpoch = 20
 	postOptis = [bo.HillClimber, bo.HillClimber, bo.RandomSearch]
+	maxTimeIncErrLimit = 700.0
+	maxTimeInc = 50
 	dump_nn_param_info()
 
 	optimizerArgs = {
@@ -394,6 +396,11 @@ if __name__ == '__main__':
 			print "done"
 			
 		if supervised:
+			nn.params[:] = bestparams()
+			trnresult = 100. * (ModuleValidator.MSE(nn, trndata))
+			tstresult = 100. * (ModuleValidator.MSE(nn, tstdata))
+			print "(before trainsteps) train error: %5.2f%%" % trnresult, ",  test error: %5.2f%%" % tstresult
+
 			print "post supervised trainsteps ...",
 			for p in population():
 				nn.params[:] = p
@@ -420,10 +427,10 @@ if __name__ == '__main__':
 		if len(tstresults) > 10: tstresults.pop(0)
 		if len(tstresults) >= 10:
 			print "test error sum of last 10 episodes:", sum(tstresults)
-			if sum(tstresults) < 50.0:
+			if sum(tstresults) < maxTimeIncErrLimit * 10:
 				pickle.dump(nn.params, open("nn_params.dump", "w"))
 				tstresults = []
-				maxtime += 100
+				maxtime += maxTimeInc
 		
 		epoch += 1
 		
