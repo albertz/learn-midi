@@ -54,6 +54,7 @@ def pcm_to_freqs(rawpcm):
 	for fdata in pcm_moved_window(rawpcm):
 		freqs = rfft(window * fdata)
 		freqs = abs(freqs) ** 2
+		freqs = freqs + 1 # for np.log
 		freqs = np.log(freqs)
 		assert len(freqs) == N_window/2+1
 		yield freqs
