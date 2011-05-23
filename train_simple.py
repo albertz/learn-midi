@@ -2,12 +2,16 @@
 # by Albert Zeyer, www.az2000.de
 # 2011-05-14
 
+from better_exchook import *
+sys.excepthook = better_exchook
+
+# only allow up to 800MB memory
+import resource
+resource.setrlimit(resource.RLIMIT_DATA, (700 * 1024 * 1024, 800 * 1024 * 1024))
+
 import midi
 from decode import *
 from soundutils import *
-
-from better_exchook import *
-sys.excepthook = better_exchook
 
 #midistr = streamcopy(midi_to_rawpcm(open(sample_mid_file)))
 #mp3str = streamcopy(ffmpeg_to_rawpcm(open(sample_mp3_file)))
@@ -321,7 +325,7 @@ if __name__ == '__main__':
 	
 	dump_nn_param_info()
 
-	optimizerArgs = {"evaluator": eval_nn, "initEvaluable": nn.params, "maxEvaluations": 1000, "minimize": True}
+	optimizerArgs = {"evaluator": eval_nn, "initEvaluable": nn.params, "maxEvaluations": 1, "minimize": True}
 	if blackbox:
 		method = bo.GA
 		#method = bo.ExactNES
@@ -349,15 +353,17 @@ if __name__ == '__main__':
 		if postoptimize:
 			for p in population():
 				nn.params[:] = p
-				postopti = bo.NelderMead(**optimizerArgs)
+				postopti = bo.HillClimber(**optimizerArgs)
 				postopti._learnStep()
 				p[:], besterr = postopti._bestFound()
-				
+			print "post optimize done"
+			
 		if supervised:
 			for p in population():
 				nn.params[:] = p
 				trainer.__class__.__init__(nn) # to recopy params or do whatever else is needed
 				trainer.train()
+			print "post supervised trainstep done"
 		
 		nn.params[:] = bestparams()
 		print "max param:", max(map(abs, nn.params))
