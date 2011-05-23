@@ -79,8 +79,8 @@ nn.addOutputModule(nn_out_midi)
 #nn_hidden_in = LinearLayer(20, name="hidden-in")
 #nn_hidden_mid = LSTMLayer(20, name="hidden-lstm")
 #nn_hidden_out = LinearLayer(5, name="hidden-out")
-nn_hidden_in = LinearLayer(nn_out_midi.indim, name="hidden-in")
-nn_hidden_out = LinearLayer(nn_out_midi.indim, name="hidden-out")
+nn_hidden_in = SigmoidLayer(nn_out_midi.indim, name="hidden-in")
+nn_hidden_out = SigmoidLayer(nn_out_midi.indim, name="hidden-out")
 
 # IN -> HIDDEN-IN
 for i in xrange(nn_hidden_in.indim - nn_in_origaudio.outdim):
