@@ -323,7 +323,7 @@ if __name__ == '__main__':
 	from pybrain.tools.validation import ModuleValidator
 	import pybrain.supervised as bt
 	#trainer = bt.BackpropTrainer(nn, learningrate=0.0001, momentum=0.1)
-	trainer = bt.RPropMinusTrainer(nn)
+	trainer = bt.RPropMinusTrainer(nn, learningrate=0.001)
 	
 	def eval_nn(params):
 		global nn, trndata
@@ -332,11 +332,12 @@ if __name__ == '__main__':
 		return ModuleValidator.MSE(nn, trndata)
 	
 	limitParams = (-10.0,10.0)
-	supervised = False
+	supervised = True
+	supervisedStepNum = 10
 	blackbox = True
-	postoptimize = True
+	postoptimize = False
 	regenerateEpoch = 20
-	postOptis = [bo.HillClimber, bo.RandomSearch]
+	postOptis = [bo.HillClimber, bo.HillClimber, bo.RandomSearch]
 	dump_nn_param_info()
 
 	optimizerArgs = {
@@ -344,8 +345,8 @@ if __name__ == '__main__':
 		"maxEvaluations": 1, "minimize": True,
 		}
 	optiGeneticArgs = {
-		"elitism": True, "eliteProportion": 0.1,
-		"populationSize": 50,
+		"elitism": True, "eliteProportion": 0.2,
+		"populationSize": 20,
 	}
 	if blackbox:
 		method = bo.GA
@@ -366,7 +367,6 @@ if __name__ == '__main__':
 			print "generating data (maxtime = " + str(maxtime) + ") ...",
 			trndata = generateData(nseq = nseq, maxtime = maxtime)
 			tstdata = generateData(nseq = nseq, maxtime = maxtime)
-			if supervised: trainer.setData(trndata)
 			print "done"
 		
 		if blackbox:
@@ -376,9 +376,11 @@ if __name__ == '__main__':
 			print "done, best error:", besterror
 
 		if limitParams:
+			print "limiting params ...",
 			for p in population():
 				p[:] = map(lambda x: max(limitParams[0], min(limitParams[1], x)), p)
-
+			print "done"
+			
 		if postoptimize:
 			print "post optimize ...",
 			optiIndex = 0
@@ -395,8 +397,11 @@ if __name__ == '__main__':
 			print "post supervised trainsteps ...",
 			for p in population():
 				nn.params[:] = p
-				trainer.__class__.__init__(nn) # to recopy params or do whatever else is needed
-				trainer.train()
+				trainer.__class__.__init__(trainer, nn) # to recopy params or do whatever else is needed
+				trainer.setData(trndata)
+				for _ in xrange(supervisedStepNum):
+					trainer.train()
+				p[:] = nn.params
 			print "done"
 		
 		nn.params[:] = bestparams()
@@ -405,11 +410,11 @@ if __name__ == '__main__':
 		tstresult = 100. * (ModuleValidator.MSE(nn, tstdata))
 		print "train error: %5.2f%%" % trnresult, ",  test error: %5.2f%%" % tstresult
 		
-		while supervised and trnresult > 5:
-			trainer.train()
-			trnresult = 100. * (ModuleValidator.MSE(nn, trndata))
-			tstresult = 100. * (ModuleValidator.MSE(nn, tstdata))
-			print "train error: %5.2f%%" % trnresult, ",  test error: %5.2f%%" % tstresult
+		#while supervised and trnresult > 5:
+		#	trainer.train()
+		#	trnresult = 100. * (ModuleValidator.MSE(nn, trndata))
+		#	tstresult = 100. * (ModuleValidator.MSE(nn, tstdata))
+		#	print "train error: %5.2f%%" % trnresult, ",  test error: %5.2f%%" % tstresult
 			
 		tstresults += [tstresult]
 		if len(tstresults) > 10: tstresults.pop(0)
