@@ -10,7 +10,7 @@
 
 # https://github.com/albertz/py_better_exchook
 
-import sys
+import sys, os, os.path
 
 def parse_py_statement(line):
 	state = 0
@@ -66,10 +66,17 @@ def parse_py_statement(line):
 	if state == 3: yield ("id", curtoken)
 	elif state == 6: yield ("comment", curtoken)
 
+
+pykeywords = set([
+	"for","in","while","print","continue","break",
+	"if","else","elif","yield","return","def","class",
+	"raise","try","except","import","pass","lambda",
+	])
+
 def grep_full_py_identifiers(tokens):
+	global pykeywords
 	tokens = list(tokens)
 	i = 0
-	pykeywords = set(["for","in","while","print","continue","break","if","else","elif","yield","def","class","try","except","import","pass","lambda"])
 	while i < len(tokens):
 		tokentype, token = tokens[i]
 		i += 1
@@ -82,24 +89,45 @@ def grep_full_py_identifiers(tokens):
 		if token[0] in ".0123456789": continue
 		yield token
 
-
-def output_limit():
-	return 300
 	
-def output(s):
-	limit = output_limit()
-	if len(s) > limit:
-		s = s[:limit - 3] + "..."
-	sys.stderr.write(s)
-	sys.stderr.write("\n")
-	sys.stderr.flush()
-
 def debug_shell(user_ns, user_global_ns):
 	from IPython.Shell import IPShellEmbed,IPShell
 	ipshell = IPShell(argv=[], user_ns=user_ns, user_global_ns=user_global_ns)
 	#ipshell()
 	ipshell.mainloop()
+
+def output(s): print s
+
+def output_limit():
+	return 300
+
+def pp_extra_info(obj):
+	s = []
+	if hasattr(obj, "__len__"):
+		try: s += ["len = " + str(obj.__len__())]
+		except: pass
+	if hasattr(obj, "__getitem__"):
+		try:
+			subobj = obj.__getitem__(0)
+			s += ["_[0]: {" + pp_extra_info(subobj) + "}"]
+		except: pass
+	return ", ".join(s)
 	
+def pretty_print(obj):
+	s = repr(obj)
+	limit = output_limit()
+	if len(s) > limit:
+		s = s[:limit - 3] + "..."
+	extra_info = pp_extra_info(obj)
+	if extra_info != "": s += ", " + extra_info
+	return s
+
+def fallback_findfile(filename):
+	mods = [ m for m in sys.modules.values() if m and hasattr(m, "__file__") and filename in m.__file__ ]
+	if len(mods) == 0: return None
+	altfn = mods[0].__file__
+	if altfn[-4:-1] == ".py": altfn = altfn[:-1] # *.pyc or whatever
+	return altfn
 
 def better_exchook(etype, value, tb):
 	output("EXCEPTION")
@@ -129,6 +157,11 @@ def better_exchook(etype, value, tb):
 			filename = co.co_filename
 			name = co.co_name
 			output('  File "%s", line %d, in %s' % (filename,lineno,name))
+			if not os.path.isfile(filename):
+				altfn = fallback_findfile(filename)
+				if altfn:
+					output("    -- couldn't find file, trying this instead: " + altfn)
+					filename = altfn
 			linecache.checkcache(filename)
 			line = linecache.getline(filename, lineno, f.f_globals)
 			if line:
@@ -141,13 +174,15 @@ def better_exchook(etype, value, tb):
 					for token in map(lambda i: splittedtoken[0:i], range(1, len(splittedtoken) + 1)):
 						if token in alreadyPrintedLocals: continue
 						tokenvalue = None
-						tokenvalue = _trySet(tokenvalue, lambda: "<local> " + repr(_resolveIdentifier(f.f_locals, token)))
-						tokenvalue = _trySet(tokenvalue, lambda: "<global> " + repr(_resolveIdentifier(f.f_globals, token)))
-						tokenvalue = _trySet(tokenvalue, lambda: "<builtin> " + repr(_resolveIdentifier(f.f_builtins, token)))
+						tokenvalue = _trySet(tokenvalue, lambda: "<local> " + pretty_print(_resolveIdentifier(f.f_locals, token)))
+						tokenvalue = _trySet(tokenvalue, lambda: "<global> " + pretty_print(_resolveIdentifier(f.f_globals, token)))
+						tokenvalue = _trySet(tokenvalue, lambda: "<builtin> " + pretty_print(_resolveIdentifier(f.f_builtins, token)))
 						tokenvalue = tokenvalue or "<not found>"
 						output('      ' + ".".join(token) + " = " + tokenvalue)
 						alreadyPrintedLocals.add(token)
 				if len(alreadyPrintedLocals) == 0: output("       no locals")
+			else:
+				output('    -- code not available --')
 			_tb = _tb.tb_next
 			n += 1
 
@@ -177,9 +212,7 @@ def better_exchook(etype, value, tb):
 		output(_format_final_exc_line(etype.__name__, value))
 
 	debug = False
-	try:
-		import os
-		debug = int(os.environ["DEBUG"]) != 0
+	try: debug = int(os.environ["DEBUG"]) != 0
 	except: pass
 	if debug:
 		output("---------- DEBUG SHELL -----------")
