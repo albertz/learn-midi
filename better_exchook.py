@@ -70,7 +70,7 @@ def parse_py_statement(line):
 pykeywords = set([
 	"for","in","while","print","continue","break",
 	"if","else","elif","yield","return","def","class",
-	"raise","try","except","import","pass","lambda",
+	"raise","try","except","import","as","pass","lambda",
 	])
 
 def grep_full_py_identifiers(tokens):
@@ -101,15 +101,24 @@ def output(s): print s
 def output_limit():
 	return 300
 
-def pp_extra_info(obj):
+def pp_extra_info(obj, depthlimit = 3):
 	s = []
 	if hasattr(obj, "__len__"):
-		try: s += ["len = " + str(obj.__len__())]
-		except: pass
-	if hasattr(obj, "__getitem__"):
 		try:
-			subobj = obj.__getitem__(0)
-			s += ["_[0]: {" + pp_extra_info(subobj) + "}"]
+			if type(obj) in [str,list,tuple,dict] and len(obj) <= 5:
+				pass # don't print len in this case
+			else:
+				s += ["len = " + str(obj.__len__())]
+		except: pass
+	if depthlimit > 0 and hasattr(obj, "__getitem__"):
+		try:
+			if type(obj) in [str]:
+				pass # doesn't make sense to get subitems here
+			else:
+				subobj = obj.__getitem__(0)
+				extra_info = pp_extra_info(subobj, depthlimit - 1)
+				if extra_info != "":
+					s += ["_[0]: {" + extra_info + "}"]
 		except: pass
 	return ", ".join(s)
 	
