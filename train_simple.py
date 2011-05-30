@@ -368,7 +368,7 @@ if __name__ == '__main__':
 	regenerateEpoch = 20
 	postOptis = [bo.HillClimber, bo.HillClimber, bo.RandomSearch]
 	maxTimeIncErrLimit = 700.0
-	maxTimeInc = 50
+	maxTimeInc = 1000
 	dump_nn_param_info()
 
 	optimizerArgs = {
@@ -445,6 +445,8 @@ if __name__ == '__main__':
 		trnresult = 100. * (ModuleValidator.MSE(nn, trndata))
 		tstresult = 100. * (ModuleValidator.MSE(nn, tstdata))
 		print "train error: %5.2f%%" % trnresult, ",  test error: %5.2f%%" % tstresult
+
+		pickle.dump((maxtime, nn.params), open("nn_params.dump", "w"))
 		
 		#while supervised and trnresult > 5:
 		#	trainer.train()
@@ -457,7 +459,6 @@ if __name__ == '__main__':
 		if len(tstresults) >= 10:
 			print "test error sum of last 10 episodes:", sum(tstresults)
 			if sum(tstresults) < maxTimeIncErrLimit * 10:
-				pickle.dump(nn.params, open("nn_params.dump", "w"))
 				tstresults = []
 				maxtime += maxTimeInc
 		

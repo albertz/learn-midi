@@ -16,7 +16,7 @@ def origRawPcm():
 
 import pickle
 import train_simple as t
-t.nn.params[:] = pickle.load(open("nn_params.dump"))
+_, t.nn.params[:] = pickle.load(open("nn_params.dump"))
 
 def midiEventHook(stream):
 	for ev in stream:
