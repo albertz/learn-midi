@@ -145,6 +145,8 @@ audioIn = AudioIn()
 
 def midistates_to_midievents(midistate_seq, oldMidiKeysState = (False,) * MIDINOTENUM):
 	for midiKeysState, midiKeysVelocity in midistate_seq:
+		assert len(midiKeysState) == MIDINOTENUM
+		assert len(midiKeysVelocity) == MIDINOTENUM
 		for note,oldstate,newstate,velocity in izip(count(), oldMidiKeysState, midiKeysState, midiKeysVelocity):
 			if not oldstate and newstate:
 				yield ("noteon", 0, note, max(0, min(127, int(round(velocity)))))
@@ -192,7 +194,6 @@ def interpretOutMidiKeyVelocities(vec):
 
 def readMidiKeyVelocities_netOutput(vec): pass
 
-
 def getCurMidiKeyVelocities_netInput():
 	return list(midiSampler.midiKeysVelocity)
 
@@ -208,6 +209,33 @@ def getMidiSamplerAudio_netInput():
 def midiVelAsNetInput(vel):
 	return vel / 128.0
 
+def interpretOutVel(vel):
+	return min(128.0, max(0.0, vel * 128.0))
+
+def interpretNetOutSeq(outseq):
+	lastMidiKeysState = [False] * MIDINOTENUM
+	for vec in outseq:
+		assert len(vec) == 2 * MIDINOTENUM
+		netOutKeys = vec[:MIDINOTENUM]
+		netOutVels = vec[MIDINOTENUM:]
+		keyState = interpretOutMidiKeys(lastMidiKeysState, netOutKeys)
+		vels = map(interpretOutVel, netOutVels)
+		yield keyState, vels
+		lastMidiKeysState = keyState
+
+def pcmStreamToNetSeq(nn, pcm_stream):
+	nn.reset()
+	for freqs in pcm_to_freqs(pcm_stream):
+		outvec = nn.activate(freqs)
+		yield outvec
+
+def midiEventsFromPcmViaNet(nn, pcm_stream):
+	return \
+		midistates_to_midievents(
+		interpretNetOutSeq(
+		pcmStreamToNetSeq(
+			nn, pcm_stream)))
+	
 
 import pybrain.supervised as bt
 from numpy.random import normal
