@@ -73,7 +73,7 @@ MIDINOTENUM = 128
 
 print "preparing network ...",
 nn = bn.RecurrentNetwork()
-nn_in_origaudio = LinearLayer(N_window/2+1, name="audioin") # audio freqs input, mono signal
+nn_in_origaudio = SigmoidLayer(N_window/2+1, name="audioin") # audio freqs input, mono signal
 nn_out_midi = SigmoidLayer(MIDINOTENUM * 2, name="outmidi")
 
 nn.addInputModule(nn_in_origaudio)
