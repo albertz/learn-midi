@@ -338,7 +338,7 @@ if __name__ == '__main__':
 		ipshell()
 	#thread.start_new_thread(userthread, ())
 	
-	maxtime = 50
+	maxtime = 1000
 	nseq = 10
 	
 	import pickle
