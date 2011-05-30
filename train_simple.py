@@ -249,7 +249,7 @@ def generate_random_midistate_seq(millisecs):
 			midiKeysState[note] = random_note_time()
 			midiKeysVelocity[note] = random_note_vel()
 
-		midiKeysVelocity = map(lambda (s,v): midiVelAsNetInput(v) if s >= 0 else 0.0, izip(midiKeysState, midiKeysVelocity))
+		midiKeysVelocity = map(lambda (s,v): v if s >= 0 else 0.0, izip(midiKeysState, midiKeysVelocity))
 		yield (map(lambda s: s >= 0, midiKeysState), midiKeysVelocity)
 
 def generate_silent_midistate_seq(millisecs):
@@ -278,7 +278,8 @@ def generate_seq(maxtime):
 		#print "XXX", tick, pcm_stream.tell(), len(pcm_stream.getvalue()), millisecs, TicksPerSecond * millisecs / 1000
 		audio = freqs
 		midikeystate,midikeyvel = midistate_seq[tick]
-		midikeystate = map(lambda s: 1.0 if s else 0.0, midikeystate)		
+		midikeystate = map(lambda s: 1.0 if s else 0.0, midikeystate)
+		midikeyvel = map(midiVelAsNetInput, midikeyvel)
 		yield (audio, midikeystate + midikeyvel)
 
 def addSequence(dataset, maxtime):
