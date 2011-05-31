@@ -225,9 +225,12 @@ def interpretNetOutSeq(outseq):
 
 def pcmStreamToNetSeq(nn, pcm_stream):
 	nn.reset()
+	oldforget = nn.forget
+	nn.forget = True
 	for freqs in pcm_to_freqs(pcm_stream):
 		outvec = nn.activate(freqs)
 		yield outvec
+	nn.forget = oldforget
 
 def midiEventsFromPcmViaNet(nn, pcm_stream):
 	return \
