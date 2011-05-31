@@ -368,7 +368,7 @@ if __name__ == '__main__':
 	supervisedStepNum = 2
 	blackbox = True
 	postoptimize = False
-	regenerateEpoch = 20
+	regenerateEpoch = 4
 	postOptis = [bo.HillClimber, bo.HillClimber, bo.RandomSearch]
 	maxTimeIncErrLimit = 700.0
 	maxTimeInc = 1000
