@@ -355,7 +355,7 @@ if __name__ == '__main__':
 	from pybrain.tools.validation import ModuleValidator
 	import pybrain.supervised as bt
 	#trainer = bt.BackpropTrainer(nn, learningrate=0.0001, momentum=0.1)
-	trainer = bt.RPropMinusTrainer(nn, learningrate=0.001)
+	trainer = bt.RPropMinusTrainer(nn, learningrate=0.0001)
 	
 	def eval_nn(params):
 		global nn, trndata
@@ -363,7 +363,7 @@ if __name__ == '__main__':
 		nn.params[:] = params
 		return ModuleValidator.MSE(nn, trndata)
 	
-	limitParams = (-10.0,10.0)
+	limitParams = (-100.0,100.0)
 	supervised = True
 	supervisedStepNum = 10
 	blackbox = True
