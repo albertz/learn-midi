@@ -3,3 +3,6 @@
 
 # NetBeans
 nbproject
+
+# ignore if not stated explicitely
+nn_params.dump
