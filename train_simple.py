@@ -365,7 +365,7 @@ if __name__ == '__main__':
 	
 	limitParams = (-100.0,100.0)
 	supervised = True
-	supervisedStepNum = 10
+	supervisedStepNum = 2
 	blackbox = True
 	postoptimize = False
 	regenerateEpoch = 20
