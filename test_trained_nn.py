@@ -21,9 +21,9 @@ _, t.nn.params[:] = pickle.load(open("nn_params.dump"))
 def midiEventHook(stream):
 	for ev in stream:
 		print ev
-		#if ev[0] == "noteon" and ev[3] == 0:
-			#ev = list(ev)
-			#ev[3] = 60 # hack
+		if ev[0] == "noteon" and ev[3] == 0:
+			ev = list(ev)
+			ev[3] = 60 # hack
 		yield ev
 
 netMidiEvents = t.midiEventsFromPcmViaNet(t.nn, origRawPcm())
