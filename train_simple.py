@@ -82,7 +82,7 @@ nn.addOutputModule(nn_out_midi)
 #nn_hidden_in = LinearLayer(20, name="hidden-in")
 #nn_hidden_mid = LSTMLayer(20, name="hidden-lstm")
 #nn_hidden_out = LinearLayer(5, name="hidden-out")
-nn_hidden_in = SigmoidLayer(nn_out_midi.indim * 2, name="hidden-in")
+nn_hidden_in = LSTMLayer(nn_out_midi.indim, name="hidden-in")
 nn_hidden_out = SigmoidLayer(nn_out_midi.indim * 2, name="hidden-out")
 
 nn.addModule(nn_hidden_in)
