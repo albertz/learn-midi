@@ -1,20 +1,22 @@
 #!/usr/bin/python
 
 import sys
-import Tkinter
 
-app = Tkinter.Frame()
-app.master.title("player")
+from Foundation import NSAutoreleasePool
+pool = NSAutoreleasePool.alloc().init()
 
-def keypress(ev):
-	print "press:", repr(ev.char), ev.keysym, ev.type, ev.time, ev.send_event
+from ctypes import *
 
-def keyrelease(ev):
-	print "release:", repr(ev.char), ev.keysym, ev.type, ev.time, ev.send_event
+sdl = cdll.LoadLibrary("/Library/Frameworks/SDL.framework/SDL")
 
-app.master.bind("<KeyPress>", keypress)
-app.master.bind("<KeyRelease>", keyrelease)
+sdl.SDL_Init.argtypes = (c_uint32,)
+print "SDL_Init:", sdl.SDL_Init(0xFFFF) # init everything
 
-#app.bind("<KeyPress>", keyin)
 
-app.mainloop()
+
+# foo
+
+sdl.SDL_Quit.restype = None
+sdl.SDL_Quit()
+
+del pool
