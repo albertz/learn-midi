@@ -1,5 +1,8 @@
 #!/usr/bin/python
 
+import better_exchook
+better_exchook.install()
+
 import sys, os
 from ctypes import *	
 sdl = None
@@ -53,20 +56,18 @@ def app_main():
 		SDL_QUIT = 12
 		
 	ev = c_SDLEvent()
-	
-	sdl.SDL_EnableUNICODE(1)
-	
+		
 	sdl.SDL_WaitEvent.argtypes = (POINTER(c_SDLEvent),)
 	while sdl.SDL_WaitEvent(pointer(ev)) == 1:
 		if ev.type == SDLEventTypes.SDL_QUIT: break
 		elif ev.type in [SDLEventTypes.SDL_KEYDOWN, SDLEventTypes.SDL_KEYUP]:
-			print "SDL keyboard event:", ev.key.state, ev.key.keysym.sym, ev.key.keysym.unicode
-	
-	# foo
-	
+			down = ev.key.state != 0
+			sym = ev.key.keysym.sym
+			if sym <= 127: sym = chr(sym)			
+			print "SDL keyboard event:", down, repr(sym)
+		
 	sdl.SDL_Quit.restype = None
 	sdl.SDL_Quit()
-	os._exit(0)
 
 if sys.platform == "darwin":
 
@@ -80,8 +81,12 @@ if sys.platform == "darwin":
 	
 		def activateNow_(self, aNotification):
 			NSApp().activateIgnoringOtherApps_(True)
-			app_main()
-
+			try:
+				app_main()
+			except:
+				sys.excepthook(*sys.exc_info())
+			os._exit(0)
+			
 	activator = MyApplicationActivator.alloc().init()
 	NSNotificationCenter.defaultCenter().addObserver_selector_name_object_(
 		activator,
