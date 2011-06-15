@@ -65,7 +65,11 @@ def app_main():
 			sym = ev.key.keysym.sym
 			if sym <= 127: sym = chr(sym)			
 			print "SDL keyboard event:", down, repr(sym)
-		
+			
+			if down and sym == 'q': break
+			if down and sym == '\x1b': break # ESC
+			
+			
 	sdl.SDL_Quit.restype = None
 	sdl.SDL_Quit()
 
