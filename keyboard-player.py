@@ -9,7 +9,7 @@ sdl = None
 
 def app_main():
 	sdl.SDL_Init.argtypes = (c_uint32,)
-	print "SDL_Init:", sdl.SDL_Init(0xFFFF) # init everything
+	sdl.SDL_Init(0xFFFF) # init everything
 	
 	c_SDLSurface_p = c_void_p # this suffice for us
 	sdl.SDL_SetVideoMode.restype = c_SDLSurface_p # screen
@@ -94,9 +94,6 @@ if sys.platform == "darwin":
 		NSApplicationDidFinishLaunchingNotification,
 		None,
 	)
-
-	import PyObjCTools.AppHelper
-	#PyObjCTools.AppHelper.runEventLoop()
 	
 	NSApplication.sharedApplication()
 	NSApp().run()
