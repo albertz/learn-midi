@@ -78,6 +78,7 @@ def sdl_main_loop():
 	sfid = fs.sfload("midisoundfont.sf2")
 	fs.program_select(0, sfid, 0, 0)
 	
+	debug = False
 	quit = False
 	while not quit:
 		while sdl.SDL_PollEvent(pointer(ev)) == 1:
@@ -86,14 +87,17 @@ def sdl_main_loop():
 				down = ev.key.state != 0
 				sym = ev.key.keysym.sym
 				if sym <= 127: sym = chr(sym)			
-				#print "SDL keyboard event:", down, repr(sym)
+				if debug: print "SDL keyboard event:", down, repr(sym), '"' + unichr(ev.key.keysym.unicode).encode("utf-8") + '"'
 				
-				if down and sym == 'q': quit = True
 				if down and sym == '\x1b': quit = True # ESC
-		
-				keys1 = list("asdfghjkl")
-				if sym in keys1:
-					note = keys1.index(sym) + 52
+				if down and sym == 160L: debug = not debug
+				
+				keys = list(
+					"asdfghjkl;'\\" +
+					"qwertzuiop[]" +
+					"1234567890-=")
+				if sym in keys:
+					note = keys.index(sym) + 52
 					print "note", note, "on" if down else "off"
 					if down: fs.noteon(0, note, notevel)
 					else: fs.noteoff(0, note)
@@ -119,6 +123,7 @@ def app_main():
 	
 	sdl.SDL_Init(0xFFFF) # init everything
 	sdl.SDL_SetVideoMode(640,480,0,0)
+	sdl.SDL_EnableUNICODE(1)
 	print "initialized SDL"
 
 	sdl_main_loop()
