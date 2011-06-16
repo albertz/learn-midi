@@ -5,6 +5,8 @@ better_exchook.install()
 
 import sys, os
 from ctypes import *	
+#from soundutils import *
+#import fluidsynth
 sdl = None
 
 c_SDLSurface_p = c_void_p # this suffice for us
@@ -49,27 +51,72 @@ class SDLEventTypes:
 
 def init_SDL_dll():
 	sdl.SDL_Init.argtypes = (c_uint32,)
-
+	sdl.SDL_Init.restype = c_int
+	
 	sdl.SDL_SetVideoMode.restype = c_SDLSurface_p # screen
 	sdl.SDL_SetVideoMode.argtypes = (c_int, c_int, c_int, c_uint32) # width,height,bpp,flags
 	
+	sdl.SDL_PollEvent.argtypes = (POINTER(c_SDLEvent),)
 	sdl.SDL_WaitEvent.argtypes = (POINTER(c_SDLEvent),)
 
+	sdl.SDL_GetTicks.restype = c_uint32
+	sdl.SDL_GetTicks.argtypes = ()
+	
 	sdl.SDL_Quit.restype = None
 
 def sdl_main_loop():
-	ev = c_SDLEvent()
+	ev = c_SDLEvent()	
+	oldtime = sdl.SDL_GetTicks()
+
+	fs = fluidsynth.Synth(gain=gain)
+
+	# create a symlink or just copy such a file there
+	sfid = fs.sfload("midisoundfont.sf2")
+	fs.program_select(0, sfid, 0, 0)
+	
+	for cmd in stream:
+		f = cmd[0]
+		args = cmd[1:]
+		if f == "play":
+			len, = args
+			# FluidSynth assumes an output rate of 44100 Hz.
+			# The return value will be a Numpy array of samples.
+			len = 44100 * len / 1000
+			if len > 0: yield fs.get_mono_samples(len)
+		else: getattr(fs, f)(*args)
+
+	fs.delete()
+	notevel = 50
+	
+	while True:
+		while sdl.SDL_PollEvent(pointer(ev)) == 1:
+			if ev.type == SDLEventTypes.SDL_QUIT: break
+			elif ev.type in [SDLEventTypes.SDL_KEYDOWN, SDLEventTypes.SDL_KEYUP]:
+				down = ev.key.state != 0
+				sym = ev.key.keysym.sym
+				if sym <= 127: sym = chr(sym)			
+				print "SDL keyboard event:", down, repr(sym)
+				
+				if down and sym == 'q': break
+				if down and sym == '\x1b': break # ESC
 		
-	while sdl.SDL_WaitEvent(pointer(ev)) == 1:
-		if ev.type == SDLEventTypes.SDL_QUIT: break
-		elif ev.type in [SDLEventTypes.SDL_KEYDOWN, SDLEventTypes.SDL_KEYUP]:
-			down = ev.key.state != 0
-			sym = ev.key.keysym.sym
-			if sym <= 127: sym = chr(sym)			
-			print "SDL keyboard event:", down, repr(sym)
-			
-			if down and sym == 'q': break
-			if down and sym == '\x1b': break # ESC
+				keys1 = "asdfghjkl"
+				if sym in keys1:
+					note = keys1.index(sym) + 52
+					if down: fs.noteon(0, note, notevel)
+					else: fs.noteoff(0, note, notevel)
+		
+		newtime = sdl.SDL_GetTicks()
+		len = newtime - oldtime
+		
+		# FluidSynth assumes an output rate of 44100 Hz.
+		# The return value will be a Numpy array of samples.
+		len = 44100 * len / 1000
+		if len > 0:
+			print "playing", len, "samples"
+			data = fs.get_mono_samples(len)
+			play(data)
+
 
 def app_main():
 	init_SDL_dll()
@@ -94,6 +141,7 @@ if sys.platform == "darwin":
 			try:
 				app_main()
 			except:
+				print "Error"
 				sys.excepthook(*sys.exc_info())
 			os._exit(0)
 			
